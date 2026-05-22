@@ -48,6 +48,18 @@ const IndexPage = () => {
         </p>
       </div>
 
+      {/* Password Manager */}
+      <div className={styles.vaultBanner}>
+        <span className={styles.vaultDot} />
+        <div className={styles.vaultText}>
+          <strong>Corp Capsula</strong> — gestor de contraseñas cifrado,
+          local y sin conexión.
+        </div>
+        <Link to={'/vault'} className={styles.vaultLink}>
+          Abrir bóveda
+        </Link>
+      </div>
+
       {/* Collection Container */}
       <div className={styles.collectionContainer}>
         <Container size={'large'}>
