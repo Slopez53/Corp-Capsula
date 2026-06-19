@@ -311,6 +311,29 @@ textarea{resize:none;height:64px;line-height:1.5}
 .logo-upload-box:hover{border-color:var(--accent)}
 .logo-preview{width:60px;height:60px;border-radius:10px;object-fit:cover;
   margin:0 auto 8px;display:block;}
+/* PRODUCTOS PAGE */
+.prod-page-item{display:flex;flex-wrap:wrap;gap:6px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center}
+.prod-page-item:last-child{border-bottom:none}
+/* CALENDAR / COMPRAS */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.cal-nav-lbl{font-size:.9em;font-weight:700}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:4px}
+.cal-hdr-cell{font-size:.62em;color:var(--muted);text-align:center;padding:3px 0;font-weight:600}
+.cal-day{min-height:34px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.8em;cursor:pointer;transition:background .15s;position:relative}
+.cal-day.empty{cursor:default;background:none!important}
+.cal-day.has-data{background:var(--adim);color:var(--accent);font-weight:700}
+.cal-day.today-mark{border:2px solid var(--accent)}
+.cal-day.sel-day{background:var(--accent)!important;color:#fff!important}
+.cal-day:active:not(.empty){opacity:.75}
+.cal-dots{display:flex;gap:2px;justify-content:center;margin-top:1px}
+.cal-dot{width:4px;height:4px;border-radius:50%;background:var(--green)}
+.prov-card{background:var(--sfc);border:1px solid var(--border);border-radius:var(--radius);padding:12px 13px;margin-bottom:7px;cursor:pointer;transition:border-color .2s;display:flex;justify-content:space-between;align-items:center}
+.prov-card:active{background:var(--sfc2)}
+/* DOC EDITOR */
+.editor-canvas-wrap{position:relative;overflow:hidden;border-radius:10px;background:#000;touch-action:none;-webkit-user-select:none;user-select:none}
+.editor-tools{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}
+.editor-tool-btn{border:1px solid var(--border);border-radius:20px;padding:7px 14px;font-size:.81em;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;background:var(--sfc2);color:var(--text)}
+.editor-tool-btn.active{background:var(--adim);color:var(--accent);border-color:var(--accent)}
 /* PRINT */
 @media print{
   body>*:not(#print-zone){display:none!important}
@@ -437,11 +460,17 @@ textarea{resize:none;height:64px;line-height:1.5}
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('clientes')">
         <span class="mas-ico">👥</span><span class="mas-lbl">Clientes</span>
       </button>
-      <button class="mas-btn" onclick="closeModal('m-mas');goTo('devol')">
-        <span class="mas-ico">↩️</span><span class="mas-lbl">Devoluciones</span>
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('productos')">
+        <span class="mas-ico">📦</span><span class="mas-lbl">Productos</span>
+      </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('compras')">
+        <span class="mas-ico">🛒</span><span class="mas-lbl">Compras</span>
       </button>
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('inventario')">
-        <span class="mas-ico">📦</span><span class="mas-lbl">Inventario</span>
+        <span class="mas-ico">📊</span><span class="mas-lbl">Inventario</span>
+      </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('devol')">
+        <span class="mas-ico">↩️</span><span class="mas-lbl">Devoluciones</span>
       </button>
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('documentos')">
         <span class="mas-ico">📷</span><span class="mas-lbl">Documentos</span>
@@ -480,6 +509,36 @@ textarea{resize:none;height:64px;line-height:1.5}
     <button class="modal-close" onclick="closeModal('m-cobrar')">✕</button>
     <div class="modal-title">💰 Registrar cobro</div>
     <div id="m-cobrar-body"></div>
+  </div>
+</div>
+
+<!-- Modal: registrar compra -->
+<div class="modal-bg" id="m-compra" onclick="bgClose(event,'m-compra')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-compra')">✕</button>
+    <div class="modal-title">🛒 Registrar compra</div>
+    <div id="m-compra-body"></div>
+  </div>
+</div>
+
+<!-- Modal: ver detalle de compra -->
+<div class="modal-bg" id="m-compra-det" onclick="bgClose(event,'m-compra-det')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-compra-det')">✕</button>
+    <div class="modal-title">🧾 Detalle de compra</div>
+    <div id="m-compra-det-body"></div>
+  </div>
+</div>
+
+<!-- Modal: editor de documentos -->
+<div class="modal-bg" id="m-doc-editor">
+  <div class="modal" style="padding-bottom:20px">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="cancelarDocEditor()">✕</button>
+    <div class="modal-title">✂️ Editar y guardar imagen</div>
+    <div id="m-doc-editor-body"></div>
   </div>
 </div>
 
@@ -595,9 +654,11 @@ let DB = {
   productos: ['Salchichas','Chorizo','Jamón','Mortadela','Salami','Tocino','Longaniza','Butifarra'],
   unidades:  {},
   precios:   {},
-  clientes:  [],
-  entradas:  [],
-  documentos:[],
+  clientes:   [],
+  entradas:   [],
+  documentos: [],
+  proveedores:[],
+  compras:    [],
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -619,6 +680,27 @@ let busquedaDevol= '';
 let devolForm    = { idx:-1, cant:'', motivo:'', tipo:'devolucion' };
 let cobroVentaId = null;    // venta seleccionada en modal de cobro parcial
 let cobroItems   = [];      // índices de items a marcar como pagados
+
+// ── Compras ──────────────────────────────────────────────────
+let compraVisto  = null;   // proveedor name being viewed
+let compraMesNav = null;   // {y, m} for calendar nav
+let compraFechaV = null;   // specific date selected in calendar
+let compraItems  = [{ prod:'', cant:'', costo:'' }];
+let compraPendingImg = '';
+
+// ── Doc Editor ───────────────────────────────────────────────
+let DE = {
+  original:null, imgW:0, imgH:0,
+  tool:'crop',           // 'crop'|'blur'|'hide'
+  cropMode:'auto',       // 'auto'|'manual'
+  crop:null,             // {x1,y1,x2,y2} in image coords
+  edits:[],              // [{type,x1,y1,x2,y2}]
+  pointer:null,
+  selStart:null, selRect:null,
+  canvas:null, ctx:null,
+  scale:1,
+  cb:null,               // callback(dataUrl)
+};
 
 let vF = {
   cliente: '',
@@ -645,8 +727,10 @@ function cargar() {
     DB.productos = Array.isArray(p.productos) && p.productos.length ? p.productos : DB.productos;
     DB.unidades  = (p.unidades  && typeof p.unidades==='object')  ? p.unidades  : {};
     DB.precios   = (p.precios   && typeof p.precios==='object')   ? p.precios   : {};
-    DB.entradas  = Array.isArray(p.entradas)  ? p.entradas  : [];
-    DB.documentos= Array.isArray(p.documentos)? p.documentos: [];
+    DB.entradas   = Array.isArray(p.entradas)    ? p.entradas    : [];
+    DB.documentos = Array.isArray(p.documentos)  ? p.documentos  : [];
+    DB.proveedores= Array.isArray(p.proveedores) ? p.proveedores : [];
+    DB.compras    = Array.isArray(p.compras)     ? p.compras     : [];
     DB.config    = { ...DB.config, ...(p.config||{}) };
     DB.ventas.forEach((v,i) => { if (!v.numRecibo) v.numRecibo = i+1; });
     if (!DB.config.siguienteRec) DB.config.siguienteRec = DB.ventas.length + 1;
@@ -764,11 +848,12 @@ function mesPasado()  {
 // ═══════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════
-const MAS_PAGES = ['clientes','devol','ajustes','inventario','documentos'];
+const MAS_PAGES = ['clientes','devol','ajustes','inventario','documentos','productos','compras'];
 
 function goTo(p) {
   leerFormVenta();
   if (p !== 'clientes') clienteVisto = null;
+  if (p !== 'compras')  { compraVisto = null; compraFechaV = null; }
   paginaActual = p;
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   const navId = MAS_PAGES.includes(p) ? 'nav-mas' : ('nav-'+p);
@@ -2109,18 +2194,6 @@ function setPrecio(idx, val) {
 // AJUSTES
 // ═══════════════════════════════════════════════════════════
 function renderAjustes() {
-  const prodList = DB.productos.map((p,i)=>`
-    <div class="prod-cat-item" style="flex-wrap:wrap;gap:5px;padding:9px 0">
-      <span style="flex:1;min-width:120px;font-weight:500">${esc(p)}${DB.unidades[p]?` <span class="unit-tag">${esc(DB.unidades[p])}</span>`:''}</span>
-      <input type="number" min="0" placeholder="Precio" value="${(DB.precios||{})[p]||''}"
-        style="width:78px;padding:5px 8px;font-size:.82em;text-align:right"
-        oninput="setPrecio(${i},this.value)" title="Precio por ${DB.unidades[p]||'unidad'}">
-      <select class="unit-select" data-prod="${esc(p)}" onchange="setUnidadEvt(this)" style="width:72px">
-        <option value="">unid.</option>
-        ${['lb','kg','gr','paq','unid'].map(u=>`<option value="${u}"${DB.unidades[p]===u?' selected':''}>${u}</option>`).join('')}
-      </select>
-      <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="quitarProd(${i})">✕</button>
-    </div>`).join('');
 
   const cliList = DB.clientes.length
     ? DB.clientes.map((c,i)=>`
@@ -2231,15 +2304,14 @@ function renderAjustes() {
       </div>
     </div>` : ''}
 
-    <!-- Catálogo productos -->
-    <div class="card">
-      <div class="card-title">Catálogo de productos</div>
-      <div style="font-size:.74em;color:var(--muted);margin-bottom:7px">Asigna precio y unidad. El precio se auto-completa al vender.</div>
-      <div id="prod-cat">${prodList}</div>
-      <div class="add-row">
-        <input type="text" id="inp-prod" placeholder="Nuevo producto..."
-          onkeypress="if(event.key==='Enter'){event.preventDefault();addProd()}">
-        <button class="btn-sm btn-green" onclick="addProd()">＋</button>
+    <!-- shortcut to Productos -->
+    <div class="card" style="background:var(--adim);border-color:rgba(68,147,248,.3)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:.9em">📦 Registro de productos</div>
+          <div style="font-size:.75em;color:var(--muted);margin-top:2px">${DB.productos.length} productos en catálogo</div>
+        </div>
+        <button class="btn-sm" style="background:var(--accent);color:#fff" onclick="goTo('productos')">Abrir →</button>
       </div>
     </div>
 
@@ -2353,7 +2425,8 @@ function quitarProd(i) {
   if(!confirm('¿Quitar "'+p+'"?')) return;
   DB.productos.splice(i,1);
   if (DB.precios) delete DB.precios[p];
-  guardar(); goTo('ajustes');
+  if (DB.unidades) delete DB.unidades[p];
+  guardar(); goTo('productos');
 }
 
 function addCli() {
@@ -2730,21 +2803,13 @@ function renderDocumentos() {
 function guardarFoto(event) {
   const file=event.target.files[0]; if(!file)return;
   if(file.size>10*1024*1024){toast('La imagen supera los 10 MB',true);event.target.value='';return;}
-  const url=URL.createObjectURL(file);
-  const img=new Image();
-  img.onload=()=>{
-    const MAX=1200; let w=img.width,h=img.height;
-    if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
-    const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
-    canvas.getContext('2d').drawImage(img,0,0,w,h);
-    const dataUrl=canvas.toDataURL('image/jpeg',.75);
-    URL.revokeObjectURL(url);
+  event.target.value='';
+  abrirDocEditor(file, (dataUrl) => {
     const titulo=(prompt('Título del documento:','Factura '+hoy())??('Factura '+hoy())).trim()||('Factura '+hoy());
     if(!DB.documentos)DB.documentos=[];
     DB.documentos.unshift({id:uid(),fecha:hoy(),ts:Date.now(),titulo,imagen:dataUrl});
-    guardar(); toast('📷 Guardado'); event.target.value=''; render();
-  };
-  img.src=url;
+    guardar(); toast('📷 Guardado'); render();
+  });
 }
 
 function verDoc(id) {
@@ -2766,6 +2831,594 @@ function borrarDoc(id) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// REGISTRO DE PRODUCTOS
+// ═══════════════════════════════════════════════════════════
+function renderProductos() {
+  const prodList = DB.productos.map((p, i) => `
+    <div class="prod-page-item">
+      <span style="flex:1;min-width:90px;font-weight:600">${esc(p)}${DB.unidades[p]?` <span class="unit-tag">${esc(DB.unidades[p])}</span>`:''}</span>
+      <input type="number" min="0" inputmode="decimal" placeholder="Precio/${esc(DB.unidades[p]||'unid')}"
+        value="${(DB.precios||{})[p]||''}"
+        style="width:90px;padding:5px 8px;font-size:.82em;text-align:right"
+        oninput="setPrecio(${i},this.value)">
+      <select class="unit-select" data-prod="${esc(p)}" onchange="setUnidadEvt(this)" style="width:68px">
+        <option value="">unid.</option>
+        ${['lb','kg','gr','paq','unid'].map(u=>`<option value="${u}"${DB.unidades[p]===u?' selected':''}>${u}</option>`).join('')}
+      </select>
+      <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="quitarProd(${i})">✕</button>
+    </div>`).join('');
+
+  return `
+    <div class="section-title">📦 Registro de Productos <span class="badge">${DB.productos.length}</span></div>
+
+    <div class="card" style="background:var(--adim);border-color:rgba(68,147,248,.25);margin-bottom:11px">
+      <div style="font-size:.82em;color:var(--text);line-height:1.55">
+        💡 Asigna la <b>unidad</b> (lb, kg…) y el <b>precio de venta</b> de cada producto.<br>
+        El precio se auto-completa al crear una venta. Si usas libras, el sistema calcula el valor automáticamente.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Catálogo</div>
+      <div id="prod-cat-pg">
+        ${prodList || '<div style="color:var(--muted);font-size:.84em;padding:7px 0">Sin productos. Agrega el primero abajo.</div>'}
+      </div>
+      <div class="add-row" style="margin-top:11px">
+        <input type="text" id="inp-prod-pg" placeholder="Nuevo producto..."
+          onkeypress="if(event.key==='Enter'){event.preventDefault();addProdPg()}">
+        <button class="btn-sm btn-green" onclick="addProdPg()">＋</button>
+      </div>
+    </div>
+  `;
+}
+
+function addProdPg() {
+  const inp = document.getElementById('inp-prod-pg'); if (!inp) return;
+  const n = inp.value.trim();
+  if (!n) { toast('Escribe un nombre', true); return; }
+  if (DB.productos.includes(n)) { toast('Ya existe', true); inp.value = ''; return; }
+  DB.productos.push(n); guardar();
+  toast('Producto agregado');
+  goTo('productos');
+}
+
+// ═══════════════════════════════════════════════════════════
+// COMPRAS
+// ═══════════════════════════════════════════════════════════
+function renderCompras() {
+  if (compraVisto) return renderDetalleProveedor(compraVisto);
+  if (!DB.proveedores) DB.proveedores = [];
+  if (!DB.compras) DB.compras = [];
+
+  const stats = {};
+  DB.compras.forEach(c => {
+    if (!stats[c.proveedor]) stats[c.proveedor] = { total:0, count:0, ultima:'' };
+    const t = (c.items||[]).reduce((s, it) => s + (+it.costo||0), 0);
+    stats[c.proveedor].total += t;
+    stats[c.proveedor].count++;
+    if (c.fecha > stats[c.proveedor].ultima) stats[c.proveedor].ultima = c.fecha;
+  });
+
+  const totalGlobal = Object.values(stats).reduce((s, v) => s + v.total, 0);
+
+  const provCards = DB.proveedores.map((p, i) => {
+    const s = stats[p] || { total:0, count:0, ultima:'' };
+    return `<div class="prov-card" onclick="compraVisto='${esc(p)}';compraMesNav=null;compraFechaV=null;render()">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:.93em">🏭 ${esc(p)}</div>
+        <div style="font-size:.74em;color:var(--muted);margin-top:3px">
+          ${s.count} compra${s.count!==1?'s':''} ${s.ultima?'· Última: '+fmtFecha(s.ultima):''}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:10px">
+        <div style="font-weight:700;color:var(--accent)">${fmt(s.total)}</div>
+        <button class="btn-sm" style="background:var(--rdim);color:var(--red);margin-top:4px;border:1px solid rgba(248,81,73,.2)"
+          onclick="event.stopPropagation();quitarProveedor(${i})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="section-title">🛒 Compras</div>
+    <div class="stats">
+      <div class="stat accent"><div class="stat-val">${DB.proveedores.length}</div><div class="stat-lbl">Proveedores</div></div>
+      <div class="stat green"><div class="stat-val">${fmt(totalGlobal)}</div><div class="stat-lbl">Total compras</div></div>
+    </div>
+
+    ${provCards || '<div class="empty"><div class="empty-ico">🏭</div>Sin proveedores registrados<br>Agrega uno abajo</div>'}
+
+    <div class="card">
+      <div class="card-title">Agregar proveedor</div>
+      <div class="add-row">
+        <input type="text" id="inp-prov" placeholder="Nombre del proveedor..."
+          onkeypress="if(event.key==='Enter'){event.preventDefault();addProveedor()}">
+        <button class="btn-sm btn-green" onclick="addProveedor()">＋</button>
+      </div>
+    </div>
+  `;
+}
+
+function addProveedor() {
+  const inp = document.getElementById('inp-prov'); if (!inp) return;
+  const n = inp.value.trim(); if (!n) { toast('Escribe un nombre', true); return; }
+  if (!DB.proveedores) DB.proveedores = [];
+  if (DB.proveedores.includes(n)) { toast('Ya existe', true); inp.value = ''; return; }
+  DB.proveedores.push(n); guardar(); inp.value = '';
+  toast('Proveedor agregado'); render();
+}
+
+function quitarProveedor(i) {
+  const p = DB.proveedores[i];
+  if (!confirm(`¿Eliminar proveedor "${p}"?\nLas compras registradas no se eliminarán.`)) return;
+  DB.proveedores.splice(i, 1); guardar(); render();
+}
+
+function renderDetalleProveedor(nombre) {
+  const now = new Date();
+  if (!compraMesNav) compraMesNav = { y: now.getFullYear(), m: now.getMonth() };
+  const { y, m } = compraMesNav;
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const comprasTodas = (DB.compras||[]).filter(c => c.proveedor === nombre);
+  const mesStr = y + '-' + pad(m + 1);
+  const comprasMes = comprasTodas.filter(c => c.fecha && c.fecha.startsWith(mesStr));
+
+  // Map days to compras
+  const porDia = {};
+  comprasMes.forEach(c => {
+    const d = c.fecha.split('-')[2];
+    if (!porDia[d]) porDia[d] = [];
+    porDia[d].push(c);
+  });
+
+  // Calendar
+  const primerDia = new Date(y, m, 1).getDay();
+  const diasMes   = new Date(y, m + 1, 0).getDate();
+  const hoyStr    = hoy();
+  const diasSem   = ['D','L','M','M','J','V','S'];
+  let calCells = diasSem.map(d => `<div class="cal-hdr-cell">${d}</div>`).join('');
+  for (let i = 0; i < primerDia; i++) calCells += '<div class="cal-day empty"></div>';
+  for (let d = 1; d <= diasMes; d++) {
+    const ds    = pad(d);
+    const fecha = `${y}-${pad(m+1)}-${ds}`;
+    const tiene = !!porDia[ds];
+    const esHoy = fecha === hoyStr;
+    const esSel = compraFechaV === fecha;
+    calCells += `<div class="cal-day${tiene?' has-data':''}${esHoy?' today-mark':''}${esSel?' sel-day':''}"
+      onclick="${tiene||esHoy?`compraFechaV=compraFechaV==='${fecha}'?null:'${fecha}';render()`:''}">
+      <span>${d}</span>
+      ${tiene ? '<div class="cal-dots"><div class="cal-dot"></div></div>' : ''}
+    </div>`;
+  }
+
+  const comprasMostrar = compraFechaV
+    ? comprasMes.filter(c => c.fecha === compraFechaV)
+    : comprasMes;
+  const totalMes = comprasMes.reduce((s,c)=>s+(c.items||[]).reduce((s2,it)=>s2+(+it.costo||0),0),0);
+
+  const comprasHTML = comprasMostrar.length
+    ? [...comprasMostrar].sort((a,b)=>(b.ts||0)-(a.ts||0)).map(c => {
+        const totalC = (c.items||[]).reduce((s,it)=>s+(+it.costo||0),0);
+        return `<div class="venta-item" style="border-left-color:var(--accent)" onclick="verCompra('${esc(c.id)}')">
+          <div class="venta-top">
+            <span class="venta-cliente">🧾 ${fmtFecha(c.fecha)} · ${fmtHora(c.ts)}</span>
+            <span class="venta-total">${fmt(totalC)}</span>
+          </div>
+          <div class="venta-prods">${(c.items||[]).map(it=>{const u=DB.unidades[it.prod]||'';return esc(it.prod)+' ×'+fmtCant(it.cant)+(u?' '+u:'');}).join(', ')}</div>
+          ${c.facturaImg ? '<div style="font-size:.74em;color:var(--accent);margin-top:3px">📷 Factura adjunta</div>' : ''}
+        </div>`;
+      }).join('')
+    : `<div class="empty" style="padding:22px 16px"><div class="empty-ico">🧾</div>${compraFechaV ? 'Sin compras el '+fmtFecha(compraFechaV) : 'Sin compras este mes'}</div>`;
+
+  // nav arrows
+  const prevY = m===0 ? y-1 : y, prevM = m===0 ? 11 : m-1;
+  const nextY = m===11 ? y+1 : y, nextM = m===11 ? 0 : m+1;
+
+  return `
+    <button class="back-btn" onclick="compraVisto=null;compraFechaV=null;render()">← Volver</button>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
+        <div>
+          <div style="font-weight:700;font-size:.98em">🏭 ${esc(nombre)}</div>
+          <div style="font-size:.74em;color:var(--muted);margin-top:2px">${comprasTodas.length} compra${comprasTodas.length!==1?'s':''} totales</div>
+        </div>
+        <button class="btn-sm btn-green" onclick="abrirCompra('${esc(nombre)}')">＋ Nueva</button>
+      </div>
+
+      <div class="cal-nav">
+        <button class="btn-sm" style="background:var(--sfc2);border:1px solid var(--border);color:var(--text)"
+          onclick="compraMesNav={y:${prevY},m:${prevM}};compraFechaV=null;render()">‹</button>
+        <span class="cal-nav-lbl">${meses[m]} ${y}</span>
+        <button class="btn-sm" style="background:var(--sfc2);border:1px solid var(--border);color:var(--text)"
+          onclick="compraMesNav={y:${nextY},m:${nextM}};compraFechaV=null;render()">›</button>
+      </div>
+      <div class="cal-grid">${calCells}</div>
+      ${totalMes>0?`<div style="text-align:right;font-size:.8em;color:var(--muted);margin-top:8px">Este mes: <b style="color:var(--green)">${fmt(totalMes)}</b></div>`:''}
+    </div>
+
+    <div class="section-title">
+      ${compraFechaV ? fmtFecha(compraFechaV) : meses[m]+' '+y}
+      ${comprasMostrar.length ? `<span class="badge">${comprasMostrar.length}</span>` : ''}
+    </div>
+    ${comprasHTML}
+  `;
+}
+
+function abrirCompra(proveedor) {
+  compraItems = [{ prod:'', cant:'', costo:'' }];
+  compraPendingImg = '';
+  pintarCompraForm(proveedor);
+  openModal('m-compra');
+}
+
+function pintarCompraForm(proveedor) {
+  const el = document.getElementById('m-compra-body'); if (!el) return;
+  const filas = compraItems.map((it, i) => `
+    <div class="prod-row">
+      <select style="padding:8px 7px;font-size:.86em" onchange="compraItems[${i}].prod=this.value">
+        <option value="">— Producto —</option>
+        ${DB.productos.map(p=>`<option value="${esc(p)}"${it.prod===p?' selected':''}>${esc(p)}</option>`).join('')}
+      </select>
+      <input type="number" inputmode="decimal" min="0" step="0.01" placeholder="Cant"
+        value="${esc(String(it.cant))}" style="padding:8px 7px;font-size:.86em"
+        oninput="compraItems[${i}].cant=this.value">
+      <input type="number" inputmode="decimal" min="0" placeholder="Costo"
+        value="${esc(String(it.costo))}" style="padding:8px 7px;font-size:.86em"
+        oninput="compraItems[${i}].costo=this.value">
+      ${compraItems.length>1 ? `<button class="del-btn" onclick="compraItems.splice(${i},1);pintarCompraForm('${esc(proveedor)}')">✕</button>` : '<div style="width:34px"></div>'}
+    </div>`).join('');
+
+  const totalCompra = compraItems.reduce((s,it)=>s+(+it.costo||0),0);
+  el.innerHTML = `
+    <div style="font-size:.84em;font-weight:700;color:var(--accent);margin-bottom:12px">🏭 ${esc(proveedor)}</div>
+    <div class="card-title" style="margin-bottom:7px">Productos comprados</div>
+    <div id="compra-filas">${filas}</div>
+    <button class="btn btn-surface" style="margin-top:7px;font-size:.86em" onclick="compraItems.push({prod:'',cant:'',costo:''});pintarCompraForm('${esc(proveedor)}')">＋ Agregar producto</button>
+
+    ${compraPendingImg ? `
+    <div style="margin-top:12px">
+      <div style="font-size:.78em;color:var(--muted);margin-bottom:5px">📷 Factura adjunta</div>
+      <img src="${compraPendingImg}" style="width:100%;border-radius:var(--radius);max-height:180px;object-fit:cover">
+      <button class="btn-sm" style="background:var(--rdim);color:var(--red);margin-top:5px;border:1px solid rgba(248,81,73,.2)" onclick="compraPendingImg='';pintarCompraForm('${esc(proveedor)}')">✕ Quitar</button>
+    </div>` : `
+    <div style="margin-top:12px">
+      <input type="file" id="compra-foto-inp" accept="image/*" capture="environment" style="display:none"
+        onchange="procesarFotoCompra(event,'${esc(proveedor)}')">
+      <button class="btn btn-surface" style="font-size:.86em" onclick="document.getElementById('compra-foto-inp').click()">
+        📷 Adjuntar foto de factura (opcional)
+      </button>
+    </div>`}
+
+    <div style="margin-top:12px">
+      <label class="input-label">Nota (opcional)</label>
+      <input type="text" id="compra-nota" placeholder="Proveedor, lote, observaciones...">
+    </div>
+
+    <div class="total-bar" style="margin-top:12px;margin-bottom:10px">
+      <div><div style="font-size:.76em;color:var(--muted)">Total esta compra</div></div>
+      <div class="total-bar-val">${fmt(totalCompra)}</div>
+    </div>
+    <button class="btn btn-green" onclick="guardarCompra('${esc(proveedor)}')">✅ Registrar compra</button>
+  `;
+}
+
+function procesarFotoCompra(event, proveedor) {
+  const file = event.target.files[0]; if (!file) return;
+  if (file.size > 10*1024*1024) { toast('Imagen muy grande (máx 10MB)', true); return; }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const MAX=1200; let w=img.width, h=img.height;
+    if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+    const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+    canvas.getContext('2d').drawImage(img,0,0,w,h);
+    compraPendingImg = canvas.toDataURL('image/jpeg',.78);
+    URL.revokeObjectURL(url);
+    pintarCompraForm(proveedor);
+  };
+  img.src = url;
+}
+
+function guardarCompra(proveedor) {
+  const items = compraItems
+    .filter(it => it.prod?.trim() && +it.cant > 0)
+    .map(it => ({ prod:it.prod.trim(), cant:Math.round(+it.cant*1000)/1000, costo:+it.costo||0 }));
+  if (!items.length) { toast('Agrega al menos un producto con cantidad', true); return; }
+  const nota = document.getElementById('compra-nota')?.value.trim() || '';
+  if (!DB.compras) DB.compras = [];
+  DB.compras.unshift({ id:uid(), fecha:hoy(), ts:Date.now(), proveedor, items, facturaImg:compraPendingImg||'', nota });
+  guardar(); vibrar();
+  closeModal('m-compra');
+  toast('✅ Compra registrada');
+  render();
+}
+
+function verCompra(id) {
+  const c = (DB.compras||[]).find(x=>x.id===id); if (!c) return;
+  const body = document.getElementById('m-compra-det-body'); if (!body) return;
+  const total = (c.items||[]).reduce((s,it)=>s+(+it.costo||0),0);
+  body.innerHTML = `
+    <div style="font-size:.84em;font-weight:700;color:var(--accent);margin-bottom:4px">🏭 ${esc(c.proveedor)}</div>
+    <div style="font-size:.76em;color:var(--muted);margin-bottom:11px">${fmtFecha(c.fecha)} · ${fmtHora(c.ts)}</div>
+    ${(c.items||[]).map(it=>{const u=DB.unidades[it.prod]||'';return `<div class="resumen-prod"><span>${esc(it.prod)} ×${fmtCant(it.cant)}${u?' '+esc(u):''}</span><span style="color:var(--green)">${fmt(it.costo)}</span></div>`;}).join('')}
+    <div class="resumen-total"><span>Total</span><span style="color:var(--green)">${fmt(total)}</span></div>
+    ${c.nota?`<div style="margin-top:9px;font-size:.82em;color:var(--muted);padding:7px;background:var(--sfc2);border-radius:7px">📝 ${esc(c.nota)}</div>`:''}
+    ${c.facturaImg?`
+    <div style="margin-top:13px">
+      <div style="font-size:.78em;color:var(--muted);margin-bottom:6px">📷 Factura escaneada</div>
+      <img src="${c.facturaImg}" style="width:100%;border-radius:var(--radius);display:block;cursor:pointer" onclick="ampliarImg('${esc(c.id)}')">
+    </div>`:''}
+    <button class="btn btn-red" style="margin-top:13px;font-size:.86em" onclick="borrarCompra('${esc(c.id)}')">🗑️ Eliminar esta compra</button>
+  `;
+  openModal('m-compra-det');
+}
+
+function ampliarImg(id) {
+  const c = (DB.compras||[]).find(x=>x.id===id);
+  if (!c || !c.facturaImg) return;
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(`<html><body style="margin:0;background:#000"><img src="${c.facturaImg}" style="width:100vw;height:100vh;object-fit:contain"></body></html>`); w.document.close(); }
+}
+
+function borrarCompra(id) {
+  if (!confirm('¿Eliminar esta compra?')) return;
+  DB.compras = (DB.compras||[]).filter(x=>x.id!==id);
+  guardar(); toast('Compra eliminada', true);
+  closeModal('m-compra-det');
+  if (paginaActual==='compras') render();
+}
+
+// ═══════════════════════════════════════════════════════════
+// EDITOR DE DOCUMENTOS
+// ═══════════════════════════════════════════════════════════
+function abrirDocEditor(file, onSave) {
+  if (!file) return;
+  DE.cb = onSave;
+  DE.edits = [];
+  DE.selStart = null;
+  DE.selRect = null;
+  DE.pointer = null;
+  DE.tool = 'crop';
+  DE.cropMode = 'auto';
+  DE.canvas = null;
+  DE.ctx = null;
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const MAX = 1600; let w = img.width, h = img.height;
+    if (w>MAX||h>MAX) { if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;} }
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    off.getContext('2d').drawImage(img, 0, 0, w, h);
+    DE.original = off; DE.imgW = w; DE.imgH = h;
+    URL.revokeObjectURL(url);
+    // default crop 92%
+    const px = Math.round(w*.04), py = Math.round(h*.04);
+    DE.crop = { x1:px, y1:py, x2:w-px, y2:h-py };
+    autoDetectDocBorder();
+    renderDocEditorModal();
+    openModal('m-doc-editor');
+  };
+  img.src = url;
+}
+
+function autoDetectDocBorder() {
+  const { original, imgW, imgH } = DE; if (!original) return;
+  try {
+    const ctx = original.getContext('2d');
+    const sampleBrightness = (x1, y1, x2, y2) => {
+      const d = ctx.getImageData(x1, y1, x2-x1, y2-y1).data;
+      let s = 0; for (let i=0;i<d.length;i+=4) s+=(d[i]+d[i+1]+d[i+2])/3;
+      return s / (d.length/4);
+    };
+    const ew = Math.round(imgW*.1), eh = Math.round(imgH*.1);
+    const bEdge = (sampleBrightness(0,0,imgW,eh) + sampleBrightness(0,imgH-eh,imgW,imgH) +
+                   sampleBrightness(0,0,ew,imgH) + sampleBrightness(imgW-ew,0,imgW,imgH)) / 4;
+    const bCenter = sampleBrightness(Math.round(imgW*.2),Math.round(imgH*.2),Math.round(imgW*.8),Math.round(imgH*.8));
+    // Document lighter than background → tighten crop
+    if (bCenter - bEdge > 18) {
+      DE.crop = { x1:Math.round(imgW*.03), y1:Math.round(imgH*.03), x2:Math.round(imgW*.97), y2:Math.round(imgH*.97) };
+    }
+  } catch(e) {}
+}
+
+function renderDocEditorModal() {
+  const body = document.getElementById('m-doc-editor-body'); if (!body) return;
+  const info = DE.tool==='crop'
+    ? (DE.cropMode==='auto' ? 'Detección automática activa. Toca <b>Manual</b> para arrastrar las esquinas.'
+       : 'Arrastra las <b>esquinas</b> del rectángulo para ajustar el recorte.')
+    : DE.tool==='blur' ? 'Arrastra sobre el área para <b>difuminar</b> (proteger datos).'
+    : 'Arrastra para <b>ocultar</b> contenido con un rectángulo negro.';
+
+  body.innerHTML = `
+    <div style="font-size:.76em;color:var(--muted);margin-bottom:8px;line-height:1.55">${info}</div>
+    <div class="editor-tools">
+      <button class="editor-tool-btn${DE.tool==='crop'?' active':''}" onclick="setEditorTool('crop')">✂️ Recortar</button>
+      <button class="editor-tool-btn${DE.tool==='blur'?' active':''}" onclick="setEditorTool('blur')">🌫️ Difuminar</button>
+      <button class="editor-tool-btn${DE.tool==='hide'?' active':''}" onclick="setEditorTool('hide')">⬛ Ocultar</button>
+      ${DE.tool==='crop' ? `
+        <button class="editor-tool-btn${DE.cropMode==='auto'?' active':''}" onclick="DE.cropMode='auto';drawEditorCanvas()">Auto</button>
+        <button class="editor-tool-btn${DE.cropMode==='manual'?' active':''}" onclick="DE.cropMode='manual';renderDocEditorModal()">Manual</button>
+      ` : ''}
+      ${DE.edits.length ? `<button class="editor-tool-btn" style="color:var(--warn);border-color:var(--warn)" onclick="deshacerEditorEdit()">↩️ Deshacer</button>` : ''}
+    </div>
+    <div class="editor-canvas-wrap" id="editor-wrap">
+      <canvas id="editor-canvas" style="display:block;width:100%;height:auto"></canvas>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:10px">
+      <button class="btn btn-green" style="flex:1" onclick="guardarDesdeEditor()">✅ Guardar</button>
+      <button class="btn btn-surface" style="flex:1" onclick="cancelarDocEditor()">✕ Cancelar</button>
+    </div>
+  `;
+
+  const canvas = document.getElementById('editor-canvas');
+  if (!canvas || !DE.original) return;
+  canvas.width  = DE.imgW;
+  canvas.height = DE.imgH;
+  DE.canvas = canvas;
+  DE.ctx    = canvas.getContext('2d');
+  drawEditorCanvas();
+
+  canvas.addEventListener('pointerdown',  editorPointerDown,  { passive:false });
+  canvas.addEventListener('pointermove',  editorPointerMove,  { passive:false });
+  canvas.addEventListener('pointerup',    editorPointerUp,    { passive:false });
+  canvas.addEventListener('pointercancel',editorPointerUp,    { passive:false });
+}
+
+function drawEditorCanvas() {
+  const { ctx, original, imgW, imgH, crop, edits, tool, cropMode, selRect } = DE;
+  if (!ctx || !original) return;
+  ctx.drawImage(original, 0, 0);
+  edits.forEach(ed => {
+    if (ed.type==='blur') applyBlurDE(ctx, ed.x1, ed.y1, ed.x2-ed.x1, ed.y2-ed.y1);
+    else { ctx.fillStyle='#000'; ctx.fillRect(ed.x1, ed.y1, ed.x2-ed.x1, ed.y2-ed.y1); }
+  });
+  if (tool==='crop' && crop) {
+    ctx.fillStyle='rgba(0,0,0,.45)';
+    ctx.fillRect(0,0,imgW,crop.y1);
+    ctx.fillRect(0,crop.y2,imgW,imgH-crop.y2);
+    ctx.fillRect(0,crop.y1,crop.x1,crop.y2-crop.y1);
+    ctx.fillRect(crop.x2,crop.y1,imgW-crop.x2,crop.y2-crop.y1);
+    ctx.strokeStyle='#4493f8'; ctx.lineWidth=Math.max(2,Math.round(imgW/250));
+    ctx.strokeRect(crop.x1,crop.y1,crop.x2-crop.x1,crop.y2-crop.y1);
+    if (cropMode==='manual') {
+      const H = Math.max(18, Math.round(imgW/18));
+      [[crop.x1,crop.y1],[crop.x2,crop.y1],[crop.x1,crop.y2],[crop.x2,crop.y2]].forEach(([cx,cy])=>{
+        ctx.beginPath(); ctx.arc(cx,cy,H,0,Math.PI*2);
+        ctx.fillStyle='#fff'; ctx.fill();
+        ctx.strokeStyle='#4493f8'; ctx.lineWidth=Math.max(2,Math.round(imgW/250)); ctx.stroke();
+      });
+    }
+  }
+  if (selRect && (tool==='blur'||tool==='hide')) {
+    ctx.strokeStyle=tool==='blur'?'#a371f7':'#f85149';
+    ctx.lineWidth=Math.max(2,Math.round(imgW/250));
+    ctx.setLineDash([8,4]);
+    ctx.strokeRect(selRect.x,selRect.y,selRect.w,selRect.h);
+    ctx.setLineDash([]);
+  }
+}
+
+function applyBlurDE(ctx, x, y, w, h) {
+  const x0=Math.max(0,Math.round(x)), y0=Math.max(0,Math.round(y));
+  const w0=Math.min(DE.imgW-x0,Math.round(w)), h0=Math.min(DE.imgH-y0,Math.round(h));
+  if(w0<=0||h0<=0) return;
+  const tmp=document.createElement('canvas');
+  const BF=12; tmp.width=Math.max(1,Math.round(w0/BF)); tmp.height=Math.max(1,Math.round(h0/BF));
+  const tc=tmp.getContext('2d');
+  tc.drawImage(DE.original,x0,y0,w0,h0,0,0,tmp.width,tmp.height);
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='low';
+  ctx.drawImage(tmp,0,0,tmp.width,tmp.height,x0,y0,w0,h0);
+  ctx.imageSmoothingQuality='high';
+}
+
+function deCanvasXY(e) {
+  const canvas=DE.canvas; if(!canvas) return {x:0,y:0};
+  const r=canvas.getBoundingClientRect();
+  return {
+    x:Math.max(0,Math.min(DE.imgW,(e.clientX-r.left)*(DE.imgW/r.width))),
+    y:Math.max(0,Math.min(DE.imgH,(e.clientY-r.top)*(DE.imgH/r.height)))
+  };
+}
+
+function editorPointerDown(e) {
+  e.preventDefault();
+  const {x,y}=deCanvasXY(e);
+  try { DE.canvas.setPointerCapture(e.pointerId); } catch(ex){}
+  if (DE.tool==='crop'&&DE.cropMode==='manual'&&DE.crop) {
+    const H=Math.max(18,Math.round(DE.imgW/18))*2;
+    const corners=[[DE.crop.x1,DE.crop.y1,0],[DE.crop.x2,DE.crop.y1,1],[DE.crop.x1,DE.crop.y2,2],[DE.crop.x2,DE.crop.y2,3]];
+    let best=-1,bestD=Infinity;
+    corners.forEach(([cx,cy,ci])=>{const d=Math.sqrt((x-cx)**2+(y-cy)**2);if(d<H&&d<bestD){best=ci;bestD=d;}});
+    DE.pointer = best>=0 ? {corner:best} : null;
+  } else if (DE.tool==='blur'||DE.tool==='hide') {
+    DE.selStart={x,y}; DE.selRect=null; DE.pointer={drag:true};
+  }
+}
+
+function editorPointerMove(e) {
+  if (!DE.pointer) return;
+  const {x,y}=deCanvasXY(e);
+  if (DE.tool==='crop'&&DE.cropMode==='manual'&&DE.pointer.corner!==undefined) {
+    const c={...DE.crop};
+    switch(DE.pointer.corner){
+      case 0: c.x1=Math.min(x,c.x2-20); c.y1=Math.min(y,c.y2-20); break;
+      case 1: c.x2=Math.max(x,c.x1+20); c.y1=Math.min(y,c.y2-20); break;
+      case 2: c.x1=Math.min(x,c.x2-20); c.y2=Math.max(y,c.y1+20); break;
+      case 3: c.x2=Math.max(x,c.x1+20); c.y2=Math.max(y,c.y1+20); break;
+    }
+    DE.crop=c; drawEditorCanvas();
+  } else if ((DE.tool==='blur'||DE.tool==='hide')&&DE.selStart&&DE.pointer?.drag) {
+    DE.selRect={x:Math.min(DE.selStart.x,x),y:Math.min(DE.selStart.y,y),w:Math.abs(x-DE.selStart.x),h:Math.abs(y-DE.selStart.y)};
+    drawEditorCanvas();
+  }
+}
+
+function editorPointerUp(e) {
+  if (!DE.pointer) return;
+  if ((DE.tool==='blur'||DE.tool==='hide')&&DE.selRect&&DE.selRect.w>8&&DE.selRect.h>8) {
+    DE.edits.push({type:DE.tool,x1:DE.selRect.x,y1:DE.selRect.y,x2:DE.selRect.x+DE.selRect.w,y2:DE.selRect.y+DE.selRect.h});
+    // Show undo button by refreshing tools
+    const tBtn=document.querySelector('.editor-tool-btn[onclick*="deshacerEditorEdit"]');
+    if(!tBtn){
+      const tw=document.querySelector('.editor-tools');
+      if(tw){const b=document.createElement('button');b.className='editor-tool-btn';b.style.cssText='color:var(--warn);border-color:var(--warn)';b.textContent='↩️ Deshacer';b.onclick=deshacerEditorEdit;tw.appendChild(b);}
+    }
+  }
+  DE.pointer=null; DE.selStart=null; DE.selRect=null; drawEditorCanvas();
+}
+
+function setEditorTool(tool) {
+  DE.tool=tool; DE.selStart=null; DE.selRect=null; DE.pointer=null;
+  renderDocEditorModal();
+}
+
+function deshacerEditorEdit() {
+  DE.edits.pop(); drawEditorCanvas();
+  if(!DE.edits.length){const b=document.querySelector('.editor-tool-btn[onclick*="deshacer"],button[onclick*="deshacer"]');if(b)b.remove();}
+}
+
+function guardarDesdeEditor() {
+  const {original,imgW,imgH,crop,edits}=DE;
+  if(!original) return;
+  const x1=Math.round(Math.max(0,crop?crop.x1:0));
+  const y1=Math.round(Math.max(0,crop?crop.y1:0));
+  const x2=Math.round(Math.min(imgW,crop?crop.x2:imgW));
+  const y2=Math.round(Math.min(imgH,crop?crop.y2:imgH));
+  const out=document.createElement('canvas');
+  out.width=x2-x1; out.height=y2-y1;
+  const oc=out.getContext('2d');
+  oc.drawImage(original,x1,y1,out.width,out.height,0,0,out.width,out.height);
+  edits.forEach(ed=>{
+    const ex=ed.x1-x1,ey=ed.y1-y1,ew=ed.x2-ed.x1,eh=ed.y2-ed.y1;
+    if(ed.type==='blur'){
+      const x0=Math.max(0,Math.round(ex)),y0=Math.max(0,Math.round(ey));
+      const w0=Math.min(out.width-x0,Math.round(ew)),h0=Math.min(out.height-y0,Math.round(eh));
+      if(w0>0&&h0>0){
+        const tmp=document.createElement('canvas');const BF=12;
+        tmp.width=Math.max(1,Math.round(w0/BF));tmp.height=Math.max(1,Math.round(h0/BF));
+        const tc=tmp.getContext('2d');tc.drawImage(out,x0,y0,w0,h0,0,0,tmp.width,tmp.height);
+        oc.imageSmoothingEnabled=true;oc.imageSmoothingQuality='low';
+        oc.drawImage(tmp,0,0,tmp.width,tmp.height,x0,y0,w0,h0);
+        oc.imageSmoothingQuality='high';
+      }
+    } else {
+      oc.fillStyle='#000'; oc.fillRect(Math.round(ex),Math.round(ey),Math.round(ew),Math.round(eh));
+    }
+  });
+  const dataUrl=out.toDataURL('image/jpeg',.85);
+  closeModal('m-doc-editor');
+  if(DE.cb) DE.cb(dataUrl);
+  DE.cb=null; DE.original=null; DE.canvas=null; DE.ctx=null;
+}
+
+function cancelarDocEditor() {
+  DE.cb=null; DE.original=null; DE.canvas=null; DE.ctx=null;
+  closeModal('m-doc-editor');
+}
+
+// ═══════════════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════════════
 function render() {
@@ -2782,9 +3435,11 @@ function render() {
   else if (paginaActual==='ajustes')     app.innerHTML = renderAjustes();
   else if (paginaActual==='inventario')  app.innerHTML = renderInventario();
   else if (paginaActual==='documentos')  app.innerHTML = renderDocumentos();
+  else if (paginaActual==='productos')   app.innerHTML = renderProductos();
+  else if (paginaActual==='compras')     app.innerHTML = renderCompras();
   actualizarHeaderTotal();
   const fab = document.getElementById('calc-fab');
-  if (fab) fab.style.display = ['ajustes','inventario','documentos','clientes'].includes(paginaActual) ? 'none' : 'flex';
+  if (fab) fab.style.display = ['ajustes','inventario','documentos','clientes','productos','compras'].includes(paginaActual) ? 'none' : 'flex';
   requestAnimationFrame(()=>app.classList.add('page-in'));
 }
 
