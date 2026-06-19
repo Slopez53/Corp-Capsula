@@ -308,6 +308,7 @@ textarea{resize:none;height:64px;line-height:1.5}
   #print-zone{display:block!important;font-family:'Courier New',monospace;
     font-size:18pt;color:#000;background:#fff;width:72mm;margin:0 auto;padding:3mm;}
   #print-zone *{color:#000!important;background:transparent!important}
+  #print-zone img{max-width:36mm;display:block;margin:0 auto 3mm}
   .pr{white-space:pre;line-height:1.8;font-family:'Courier New',monospace}
 }
 #print-zone{display:none}
@@ -345,7 +346,7 @@ textarea{resize:none;height:64px;line-height:1.5}
 
 <div id="app"></div>
 <div id="page-overlay"></div>
-<div id="print-zone"><div class="pr" id="print-content"></div></div>
+<div id="print-zone"></div>
 
 <nav>
   <button class="active" id="nav-venta" onclick="goTo('venta')"><span class="ico">➕</span>Nueva</button>
@@ -430,10 +431,36 @@ textarea{resize:none;height:64px;line-height:1.5}
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('devol')">
         <span class="mas-ico">↩️</span><span class="mas-lbl">Devoluciones</span>
       </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('inventario')">
+        <span class="mas-ico">📦</span><span class="mas-lbl">Inventario</span>
+      </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('documentos')">
+        <span class="mas-ico">📷</span><span class="mas-lbl">Documentos</span>
+      </button>
       <button class="mas-btn" style="grid-column:1/-1" onclick="closeModal('m-mas');goTo('ajustes')">
         <span class="mas-ico">⚙️</span><span class="mas-lbl">Ajustes</span>
       </button>
     </div>
+  </div>
+</div>
+
+<!-- Modal: entrada de inventario -->
+<div class="modal-bg" id="m-entrada" onclick="bgClose(event,'m-entrada')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-entrada')">✕</button>
+    <div class="modal-title">📦 Registrar entrada</div>
+    <div id="m-entrada-body"></div>
+  </div>
+</div>
+
+<!-- Modal: ver documento -->
+<div class="modal-bg" id="m-doc" onclick="bgClose(event,'m-doc')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-doc')">✕</button>
+    <div class="modal-title">📷 Documento</div>
+    <div id="m-doc-body"></div>
   </div>
 </div>
 
@@ -548,7 +575,10 @@ let DB = {
   },
   productos: ['Salchichas','Chorizo','Jamón','Mortadela','Salami','Tocino','Longaniza','Butifarra'],
   unidades:  {},
-  clientes:  []
+  precios:   {},
+  clientes:  [],
+  entradas:  [],
+  documentos:[],
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -592,7 +622,10 @@ function cargar() {
     DB.ventas    = Array.isArray(p.ventas)    ? p.ventas    : [];
     DB.clientes  = Array.isArray(p.clientes)  ? p.clientes  : [];
     DB.productos = Array.isArray(p.productos) && p.productos.length ? p.productos : DB.productos;
-    DB.unidades  = (p.unidades && typeof p.unidades==='object') ? p.unidades : {};
+    DB.unidades  = (p.unidades  && typeof p.unidades==='object')  ? p.unidades  : {};
+    DB.precios   = (p.precios   && typeof p.precios==='object')   ? p.precios   : {};
+    DB.entradas  = Array.isArray(p.entradas)  ? p.entradas  : [];
+    DB.documentos= Array.isArray(p.documentos)? p.documentos: [];
     DB.config    = { ...DB.config, ...(p.config||{}) };
     DB.ventas.forEach((v,i) => { if (!v.numRecibo) v.numRecibo = i+1; });
     if (!DB.config.siguienteRec) DB.config.siguienteRec = DB.ventas.length + 1;
@@ -681,7 +714,7 @@ function mesPasado()  {
 // ═══════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════
-const MAS_PAGES = ['clientes','devol','ajustes'];
+const MAS_PAGES = ['clientes','devol','ajustes','inventario','documentos'];
 
 function goTo(p) {
   leerFormVenta();
@@ -763,10 +796,10 @@ function cambiarProd(i, sel) {
   } else {
     vF.items[i].prod   = sel.value;
     vF.items[i].custom = false;
-    const ult = ultimoPrecio(sel.value);
-    if (ult && !vF.items[i].precio) {
-      vF.items[i].precio = ult;
-      refrescarFilas();
+    if (!vF.items[i].precio) {
+      const cp = (DB.precios||{})[sel.value];
+      const ult = cp || ultimoPrecio(sel.value);
+      if (ult) { vF.items[i].precio = ult; refrescarFilas(); }
     }
     calcTotal();
   }
@@ -1776,14 +1809,26 @@ function exportarInforme() {
   } else { mostrarExport(txt); }
 }
 
+function setPrecio(idx, val) {
+  const p = DB.productos[idx];
+  if (!p) return;
+  if (!DB.precios) DB.precios = {};
+  const v = parseFloat(val);
+  if (v > 0) DB.precios[p] = v; else delete DB.precios[p];
+  guardar();
+}
+
 // ═══════════════════════════════════════════════════════════
 // AJUSTES
 // ═══════════════════════════════════════════════════════════
 function renderAjustes() {
   const prodList = DB.productos.map((p,i)=>`
-    <div class="prod-cat-item">
-      <span style="flex:1">${esc(p)}${DB.unidades[p]?` <span class="unit-tag">${esc(DB.unidades[p])}</span>`:''}</span>
-      <select class="unit-select" data-prod="${esc(p)}" onchange="setUnidadEvt(this)" style="width:80px;margin-right:7px">
+    <div class="prod-cat-item" style="flex-wrap:wrap;gap:5px;padding:9px 0">
+      <span style="flex:1;min-width:120px;font-weight:500">${esc(p)}${DB.unidades[p]?` <span class="unit-tag">${esc(DB.unidades[p])}</span>`:''}</span>
+      <input type="number" min="0" placeholder="Precio" value="${(DB.precios||{})[p]||''}"
+        style="width:78px;padding:5px 8px;font-size:.82em;text-align:right"
+        oninput="setPrecio(${i},this.value)" title="Precio por ${DB.unidades[p]||'unidad'}">
+      <select class="unit-select" data-prod="${esc(p)}" onchange="setUnidadEvt(this)" style="width:72px">
         <option value="">unid.</option>
         ${['lb','kg','gr','paq','unid'].map(u=>`<option value="${u}"${DB.unidades[p]===u?' selected':''}>${u}</option>`).join('')}
       </select>
@@ -1902,7 +1947,7 @@ function renderAjustes() {
     <!-- Catálogo productos -->
     <div class="card">
       <div class="card-title">Catálogo de productos</div>
-      <div style="font-size:.74em;color:var(--muted);margin-bottom:7px">Puedes asignar unidad (lb, kg, etc.) a cada producto</div>
+      <div style="font-size:.74em;color:var(--muted);margin-bottom:7px">Asigna precio y unidad. El precio se auto-completa al vender.</div>
       <div id="prod-cat">${prodList}</div>
       <div class="add-row">
         <input type="text" id="inp-prod" placeholder="Nuevo producto..."
@@ -2017,8 +2062,11 @@ function addProd() {
 }
 
 function quitarProd(i) {
-  if(!confirm('¿Quitar "'+DB.productos[i]+'"?')) return;
-  DB.productos.splice(i,1); guardar(); goTo('ajustes');
+  const p = DB.productos[i];
+  if(!confirm('¿Quitar "'+p+'"?')) return;
+  DB.productos.splice(i,1);
+  if (DB.precios) delete DB.precios[p];
+  guardar(); goTo('ajustes');
 }
 
 function addCli() {
@@ -2150,8 +2198,13 @@ function mostrarReciboVenta(venta) {
   ventaSelId = venta.id;
   const prev = document.getElementById('recibo-preview');
   if (prev) prev.textContent = txt;
-  const pz = document.getElementById('print-content');
-  if (pz) pz.innerHTML = html;
+  const pz = document.getElementById('print-zone');
+  if (pz) {
+    const logoHtml = DB.config.logo
+      ? `<img src="${DB.config.logo}" alt="Logo" style="max-width:36mm;display:block;margin:0 auto 3mm">`
+      : '';
+    pz.innerHTML = logoHtml + '<div class="pr">' + html + '</div>';
+  }
   openModal('m-recibo');
 }
 
@@ -2163,8 +2216,6 @@ function abrirRecibo() {
 }
 
 function imprimirRecibo() {
-  const pz = document.getElementById('print-content');
-  if (pz) pz.textContent = reciboTxt;
   setTimeout(() => {
     try { window.print(); }
     catch(e) { toast('Verifica que la impresora Bluetooth esté conectada.', true); }
@@ -2252,6 +2303,169 @@ function actualizarNegocio() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// INVENTARIO
+// ═══════════════════════════════════════════════════════════
+function stockActual(prod) {
+  const entrado = (DB.entradas||[]).filter(e=>e.prod===prod).reduce((s,e)=>s+(+e.cant||0),0);
+  const vendido = DB.ventas.flatMap(v=>v.items).filter(it=>it.prod===prod).reduce((s,it)=>s+(+it.cant||0),0);
+  return Math.round((entrado-vendido)*1000)/1000;
+}
+
+function renderInventario() {
+  if (!DB.entradas)  DB.entradas  = [];
+  if (!DB.precios)   DB.precios   = {};
+  const prodsConStock = DB.productos.filter(p=>stockActual(p)>0).length;
+  const valorTotal    = DB.productos.reduce((s,p)=>{const st=stockActual(p);return st>0?s+st*(+DB.precios[p]||0):s;},0);
+  const prodRows = DB.productos.map(p=>{
+    const st=stockActual(p), u=DB.unidades[p]||'';
+    const col=st>0?'var(--green)':st<0?'var(--red)':'var(--muted)';
+    return `<div class="prod-cat-item">
+      <span style="flex:1">${esc(p)}${u?` <span class="unit-tag">${esc(u)}</span>`:''}</span>
+      <span style="font-weight:700;color:${col};min-width:60px;text-align:right">${fmtCant(st)}${u?' '+esc(u):''}</span>
+      <button class="btn-sm" style="background:var(--gdim);color:var(--green);border:1px solid rgba(63,185,80,.3);margin-left:9px" onclick="abrirEntrada('${esc(p)}')">＋</button>
+    </div>`;
+  }).join('');
+  const ultimas=[...(DB.entradas)].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,10);
+  const entradasHTML=ultimas.length?ultimas.map(e=>{
+    const u=DB.unidades[e.prod]||'';
+    return `<div class="prod-cat-item">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.88em">${esc(e.prod)}</div>
+        <div style="font-size:.74em;color:var(--muted)">${fmtFecha(e.fecha)}${e.costo>0?' · '+fmt(e.costo):''}${e.nota?' · '+esc(e.nota):''}</div>
+      </div>
+      <span class="tag" style="margin-right:8px">+${fmtCant(e.cant)}${u?' '+esc(u):''}</span>
+      <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="borrarEntrada('${esc(e.id)}')">✕</button>
+    </div>`;
+  }).join(''):'<div class="empty"><div class="empty-ico">📦</div>Sin entradas registradas</div>';
+  return `
+    <div class="section-title">📦 Inventario</div>
+    <div class="stats">
+      <div class="stat green"><div class="stat-val">${prodsConStock}</div><div class="stat-lbl">Con stock</div></div>
+      <div class="stat accent"><div class="stat-val">${fmt(valorTotal)}</div><div class="stat-lbl">Valor en stock</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Stock por producto</div>
+      ${prodRows||'<div style="color:var(--muted);font-size:.84em">Sin productos en catálogo</div>'}
+    </div>
+    <div class="card"><div class="card-title">Últimas entradas</div>${entradasHTML}</div>`;
+}
+
+let entradaForm = { prod:'', cant:'', costo:'', nota:'' };
+
+function abrirEntrada(prod) {
+  entradaForm = { prod, cant:'', costo:String((DB.precios&&DB.precios[prod])||''), nota:'' };
+  pintarEntradaForm();
+  openModal('m-entrada');
+}
+
+function pintarEntradaForm() {
+  const el = document.getElementById('m-entrada-body');
+  if (!el) return;
+  const u = DB.unidades[entradaForm.prod]||'';
+  el.innerHTML = `
+    <div style="font-weight:700;font-size:1em;margin-bottom:12px">${esc(entradaForm.prod)}${u?' <span class="unit-tag">'+esc(u)+'</span>':''}</div>
+    <div class="range-row">
+      <div>
+        <label class="input-label">Cantidad${u?' ('+esc(u)+')':''}</label>
+        <input type="number" inputmode="decimal" min="0" step="0.001" id="inp-ent-cant"
+          placeholder="0" value="${esc(String(entradaForm.cant))}" oninput="entradaForm.cant=this.value">
+      </div>
+      <div>
+        <label class="input-label">Costo total</label>
+        <input type="number" inputmode="decimal" min="0" id="inp-ent-costo"
+          placeholder="0" value="${esc(String(entradaForm.costo))}" oninput="entradaForm.costo=this.value">
+      </div>
+    </div>
+    <label class="input-label">Nota (opcional)</label>
+    <input type="text" placeholder="Proveedor, lote..." value="${esc(entradaForm.nota)}"
+      style="margin-bottom:12px" oninput="entradaForm.nota=this.value">
+    <button class="btn btn-green" onclick="guardarEntrada()">✅ Registrar entrada</button>`;
+}
+
+function guardarEntrada() {
+  const cant=+entradaForm.cant;
+  if(!cant||cant<=0){toast('Ingresa una cantidad válida',true);return;}
+  if(!DB.entradas)DB.entradas=[];
+  DB.entradas.unshift({id:uid(),fecha:hoy(),ts:Date.now(),prod:entradaForm.prod,cant,costo:+entradaForm.costo||0,nota:entradaForm.nota.trim()});
+  guardar(); closeModal('m-entrada'); toast('📦 Entrada registrada');
+  if(paginaActual==='inventario')render();
+}
+
+function borrarEntrada(id) {
+  if(!confirm('¿Eliminar esta entrada?'))return;
+  DB.entradas=(DB.entradas||[]).filter(e=>e.id!==id);
+  guardar(); toast('Entrada eliminada',true);
+  if(paginaActual==='inventario')render();
+}
+
+// ═══════════════════════════════════════════════════════════
+// DOCUMENTOS
+// ═══════════════════════════════════════════════════════════
+function renderDocumentos() {
+  if(!DB.documentos)DB.documentos=[];
+  const sorted=[...DB.documentos].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const gridHTML=sorted.length
+    ?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px">${
+      sorted.map(d=>`<div style="position:relative;border-radius:var(--radius);overflow:hidden;cursor:pointer;border:1px solid var(--border)" onclick="verDoc('${esc(d.id)}')">
+        <img src="${esc(d.imagen)}" alt="${esc(d.titulo)}" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block">
+        <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);padding:6px 8px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.74em;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(d.titulo)}</span>
+          <button class="btn-sm" style="background:var(--rdim);color:var(--red);margin-left:6px;flex-shrink:0" onclick="event.stopPropagation();borrarDoc('${esc(d.id)}')">✕</button>
+        </div>
+      </div>`).join('')
+    }</div>`
+    :'<div class="empty"><div class="empty-ico">📷</div>Sin documentos guardados<br>Toca el botón para tomar una foto</div>';
+  return `
+    <div class="section-title">📷 Documentos</div>
+    <div class="card" style="text-align:center">
+      <input type="file" id="foto-inp" accept="image/*" capture="environment" style="display:none" onchange="guardarFoto(event)">
+      <button class="btn btn-surface" onclick="document.getElementById('foto-inp').click()">📷 Tomar foto / Agregar imagen</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Documentos guardados${sorted.length?' <span class="badge">'+sorted.length+'</span>':''}</div>
+      ${gridHTML}
+    </div>`;
+}
+
+function guardarFoto(event) {
+  const file=event.target.files[0]; if(!file)return;
+  if(file.size>10*1024*1024){toast('La imagen supera los 10 MB',true);event.target.value='';return;}
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
+    const MAX=1200; let w=img.width,h=img.height;
+    if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+    const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+    canvas.getContext('2d').drawImage(img,0,0,w,h);
+    const dataUrl=canvas.toDataURL('image/jpeg',.75);
+    URL.revokeObjectURL(url);
+    const titulo=(prompt('Título del documento:','Factura '+hoy())??('Factura '+hoy())).trim()||('Factura '+hoy());
+    if(!DB.documentos)DB.documentos=[];
+    DB.documentos.unshift({id:uid(),fecha:hoy(),ts:Date.now(),titulo,imagen:dataUrl});
+    guardar(); toast('📷 Guardado'); event.target.value=''; render();
+  };
+  img.src=url;
+}
+
+function verDoc(id) {
+  const d=(DB.documentos||[]).find(x=>x.id===id); if(!d)return;
+  const body=document.getElementById('m-doc-body'); if(!body)return;
+  body.innerHTML=`
+    <div style="font-weight:700;margin-bottom:4px">${esc(d.titulo)}</div>
+    <div style="font-size:.76em;color:var(--muted);margin-bottom:12px">${fmtFecha(d.fecha)}</div>
+    <img src="${esc(d.imagen)}" alt="${esc(d.titulo)}" style="width:100%;border-radius:var(--radius);display:block;margin-bottom:12px">
+    <button class="btn btn-red" onclick="borrarDoc('${esc(d.id)}');closeModal('m-doc')">🗑️ Eliminar documento</button>`;
+  openModal('m-doc');
+}
+
+function borrarDoc(id) {
+  if(!confirm('¿Eliminar este documento?'))return;
+  DB.documentos=(DB.documentos||[]).filter(x=>x.id!==id);
+  guardar(); toast('Documento eliminado',true); closeModal('m-doc');
+  if(paginaActual==='documentos')render();
+}
+
+// ═══════════════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════════════
 function render() {
@@ -2259,14 +2473,18 @@ function render() {
   if (!app) return;
   app.scrollTop = 0;
   app.classList.remove('page-in');
-  if      (paginaActual==='venta')    app.innerHTML = renderVenta();
-  else if (paginaActual==='hoy')      app.innerHTML = renderHoy();
-  else if (paginaActual==='ventas')   app.innerHTML = renderVentas();
-  else if (paginaActual==='clientes') app.innerHTML = renderClientes();
-  else if (paginaActual==='devol')    app.innerHTML = renderDevol();
-  else if (paginaActual==='informe')  app.innerHTML = renderInforme();
-  else if (paginaActual==='ajustes')  app.innerHTML = renderAjustes();
+  if      (paginaActual==='venta')       app.innerHTML = renderVenta();
+  else if (paginaActual==='hoy')         app.innerHTML = renderHoy();
+  else if (paginaActual==='ventas')      app.innerHTML = renderVentas();
+  else if (paginaActual==='clientes')    app.innerHTML = renderClientes();
+  else if (paginaActual==='devol')       app.innerHTML = renderDevol();
+  else if (paginaActual==='informe')     app.innerHTML = renderInforme();
+  else if (paginaActual==='ajustes')     app.innerHTML = renderAjustes();
+  else if (paginaActual==='inventario')  app.innerHTML = renderInventario();
+  else if (paginaActual==='documentos')  app.innerHTML = renderDocumentos();
   actualizarHeaderTotal();
+  const fab = document.getElementById('calc-fab');
+  if (fab) fab.style.display = ['ajustes','inventario','documentos'].includes(paginaActual) ? 'none' : 'flex';
   requestAnimationFrame(()=>app.classList.add('page-in'));
 }
 
