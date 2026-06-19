@@ -261,6 +261,15 @@ textarea{resize:none;height:64px;line-height:1.5}
   display:flex;justify-content:space-between;align-items:center;}
 .fiado-banner-lbl{font-size:.8em;color:var(--warn);font-weight:600}
 .fiado-banner-val{font-size:1.08em;font-weight:700;color:var(--warn)}
+/* RIESGO / DEUDA */
+.badge-red{background:var(--rdim);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+.deuda-aviso{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.4);
+  border-radius:var(--radius);padding:12px 13px;margin-bottom:11px;}
+.risk-bar{height:6px;border-radius:3px;background:var(--sfc2);overflow:hidden;margin-top:6px;flex:1}
+.risk-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.cobrar-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.cobrar-row:last-child{border-bottom:none}
+.cobrar-check{width:22px;height:22px;flex-shrink:0;cursor:pointer;accent-color:var(--accent)}
 /* CALCULATOR FAB */
 #calc-fab{position:fixed;right:14px;bottom:120px;z-index:30;
   width:46px;height:46px;border-radius:50%;border:none;
@@ -371,7 +380,7 @@ textarea{resize:none;height:64px;line-height:1.5}
       <button class="btn btn-surface" style="flex:1;min-width:90px" onclick="compartirVenta()">📤 Compartir</button>
     </div>
     <div style="display:flex;gap:7px;margin-top:7px">
-      <button class="btn btn-surface" style="font-size:.86em;flex:1" id="btn-fiado-pagar" onclick="marcarFiadoPagado()" style="display:none">✅ Fiado pagado</button>
+      <button class="btn btn-surface" style="font-size:.86em;flex:1" id="btn-fiado-pagar" onclick="abrirCobro(ventaSelId);closeModal('m-detalle')">💰 Cobrar</button>
       <button class="btn btn-red" style="font-size:.86em;flex:1" onclick="pedirEliminar()">🗑️ Eliminar</button>
     </div>
     <div style="display:flex;gap:7px;margin-top:7px">
@@ -461,6 +470,16 @@ textarea{resize:none;height:64px;line-height:1.5}
     <button class="modal-close" onclick="closeModal('m-doc')">✕</button>
     <div class="modal-title">📷 Documento</div>
     <div id="m-doc-body"></div>
+  </div>
+</div>
+
+<!-- Modal: cobrar deuda -->
+<div class="modal-bg" id="m-cobrar" onclick="bgClose(event,'m-cobrar')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-cobrar')">✕</button>
+    <div class="modal-title">💰 Registrar cobro</div>
+    <div id="m-cobrar-body"></div>
   </div>
 </div>
 
@@ -598,6 +617,8 @@ let cliPeriodo   = 'mes';   // agrupación del historial por cliente: dia / sema
 let devolVentaId = null;    // venta seleccionada para registrar devolución/avería
 let busquedaDevol= '';
 let devolForm    = { idx:-1, cant:'', motivo:'', tipo:'devolucion' };
+let cobroVentaId = null;    // venta seleccionada en modal de cobro parcial
+let cobroItems   = [];      // índices de items a marcar como pagados
 
 let vF = {
   cliente: '',
@@ -647,6 +668,35 @@ function fmtCant(n) { const x = Number(n)||0; return Number.isInteger(x) ? Strin
 // Devoluciones / averías descontadas de una factura
 function devTotal(v) { return (v.devoluciones||[]).reduce((s,d)=>s+(+d.monto||0),0); }
 function neto(v)     { return (v.total||0) - devTotal(v); }
+
+// ── Crédito / cobros parciales ──────────────────────────────
+function montoPagadoItems(v) {
+  if (v.pago !== 'fiado' || v.fiadoPagado) return neto(v);
+  const ip = v.itemsPagados || [];
+  if (!ip.length) return 0;
+  return v.items.reduce((s, it, i) => ip.includes(i) ? s + Math.round(it.cant * it.precio) : s, 0);
+}
+function montoPendienteV(v) {
+  if (v.pago !== 'fiado' || v.fiadoPagado) return 0;
+  return Math.max(0, neto(v) - montoPagadoItems(v));
+}
+function deudaClienteTotal(nombre) {
+  return DB.ventas
+    .filter(v => v.cliente === nombre && v.pago === 'fiado' && !v.fiadoPagado)
+    .reduce((s, v) => s + montoPendienteV(v), 0);
+}
+function perfilRiesgo(nombre) {
+  const vc = DB.ventas.filter(v => v.cliente === nombre);
+  if (!vc.length) return { score:0, label:'Nuevo', cls:'badge-green', color:'var(--muted)' };
+  const fiadas = vc.filter(v => v.pago === 'fiado');
+  const pendientes = fiadas.filter(v => !v.fiadoPagado && montoPendienteV(v) > 0);
+  const rf = fiadas.length / vc.length;
+  const ri = fiadas.length > 0 ? pendientes.length / fiadas.length : 0;
+  const score = Math.round((rf * 0.3 + ri * 0.7) * 100);
+  if (!pendientes.length) return { score:0, label:'Al día', cls:'badge-green', color:'var(--green)' };
+  if (score < 35) return { score, label:'Precaución', cls:'badge-warn', color:'var(--warn)' };
+  return { score, label:'Alto riesgo', cls:'badge-red', color:'var(--red)' };
+}
 
 function esc(s) {
   return String(s??'')
@@ -741,6 +791,27 @@ function leerFormVenta() {
   const nt = document.getElementById('input-nota');
   if (cl) vF.cliente = cl.value;
   if (nt) vF.nota    = nt.value;
+}
+
+function verificarDeudaVenta() {
+  const inp = document.getElementById('input-cliente');
+  if (!inp) return;
+  vF.cliente = inp.value;
+  const c = inp.value.trim();
+  const d = c ? deudaClienteTotal(c) : 0;
+  const el = document.getElementById('deuda-aviso-venta');
+  if (!el) return;
+  if (d > 0) {
+    el.style.display = 'block';
+    el.innerHTML = `<div style="font-size:.83em;font-weight:700;color:var(--red);margin-bottom:5px">⚠️ <b>${esc(c)}</b> tiene deuda pendiente</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.9em">Debe: <b style="color:var(--red)">${fmt(d)}</b></span>
+        <button class="btn-sm" style="background:var(--adim);color:var(--accent);border:1px solid rgba(68,147,248,.3)"
+          onclick="clienteVisto='${esc(c)}';goTo('clientes')">Ver perfil →</button>
+      </div>`;
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 function ultimoPrecio(prod) {
@@ -862,8 +933,19 @@ function renderVenta() {
     <div class="card">
       <div class="card-title">Cliente</div>
       <input list="cli-dl" id="input-cliente" placeholder="Nombre del cliente"
-        value="${esc(vF.cliente)}" autocomplete="off" oninput="vF.cliente=this.value">
+        value="${esc(vF.cliente)}" autocomplete="off" oninput="verificarDeudaVenta()">
       <datalist id="cli-dl">${cliOps}</datalist>
+    </div>
+
+    <div id="deuda-aviso-venta" class="deuda-aviso"
+      style="display:${vF.cliente.trim()&&deudaClienteTotal(vF.cliente.trim())>0?'block':'none'}">
+      ${vF.cliente.trim()&&deudaClienteTotal(vF.cliente.trim())>0?`
+        <div style="font-size:.83em;font-weight:700;color:var(--red);margin-bottom:5px">⚠️ <b>${esc(vF.cliente.trim())}</b> tiene deuda pendiente</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.9em">Debe: <b style="color:var(--red)">${fmt(deudaClienteTotal(vF.cliente.trim()))}</b></span>
+          <button class="btn-sm" style="background:var(--adim);color:var(--accent);border:1px solid rgba(68,147,248,.3)"
+            onclick="clienteVisto='${esc(vF.cliente.trim())}';goTo('clientes')">Ver perfil →</button>
+        </div>`:''}
     </div>
 
     <div class="card">
@@ -937,7 +1019,8 @@ function guardarVenta() {
   const numRecibo = DB.config.siguienteRec++;
 
   const venta = { id:uid(), fecha:hoy(), ts:Date.now(), cliente, nota, items, total,
-                  pago:vF.pago, numRecibo, fiadoPagado:false };
+                  pago:vF.pago, numRecibo, fiadoPagado:false,
+                  itemsPagados: vF.pago === 'fiado' ? [] : items.map((_,i) => i) };
 
   DB.ventas.unshift(venta);
   if (cliente!=='Sin nombre' && !DB.clientes.includes(cliente)) DB.clientes.push(cliente);
@@ -957,8 +1040,8 @@ function guardarVenta() {
 function renderHoy() {
   const ventasHoy = DB.ventas.filter(v => v.fecha === hoy());
   const total     = ventasHoy.reduce((s,v)=>s+neto(v),0);
-  const fiados    = ventasHoy.filter(v=>v.pago==='fiado'&&!v.fiadoPagado);
-  const totalFiado= fiados.reduce((s,v)=>s+neto(v),0);
+  const fiados    = ventasHoy.filter(v=>v.pago==='fiado'&&!v.fiadoPagado&&montoPendienteV(v)>0);
+  const totalFiado= fiados.reduce((s,v)=>s+montoPendienteV(v),0);
   const cliSet    = new Set(ventasHoy.map(v=>v.cliente));
 
   const prods = {};
@@ -1078,8 +1161,17 @@ function refrescarLista() {
 
 function htmlCard(v) {
   const esFiado  = v.pago==='fiado'&&!v.fiadoPagado;
+  const pend     = esFiado ? montoPendienteV(v) : 0;
+  const pagItems = esFiado ? montoPagadoItems(v) : 0;
+  const parcial  = esFiado && pagItems > 0 && pend > 0;
   const cls      = esFiado ? 'venta-item fiado' : v.fiadoPagado ? 'venta-item fiado-pagado' : 'venta-item';
-  const pagoLbl  = v.pago==='fiado' ? (v.fiadoPagado?'<span class="badge-green badge">Pagado</span>':'<span class="badge-warn badge">Fiado</span>') : '';
+  const pagoLbl  = v.pago==='fiado'
+    ? (v.fiadoPagado
+        ? '<span class="badge-green badge">Pagado</span>'
+        : parcial
+          ? `<span class="badge-warn badge">Parcial ·debe ${fmt(pend)}</span>`
+          : '<span class="badge-warn badge">Fiado</span>')
+    : '';
   const devLbl   = devTotal(v)>0 ? '<span class="badge-warn badge" style="margin-left:4px">↩️ −'+fmt(devTotal(v))+'</span>' : '';
   const prodsStr = v.items.map(it=>{
     const u = DB.unidades[it.prod]||'';
@@ -1110,37 +1202,62 @@ function renderClientes() {
     stats[v.cliente].total += neto(v);
     stats[v.cliente].count++;
     if (v.fecha > stats[v.cliente].ultima) stats[v.cliente].ultima = v.fecha;
-    if (v.pago==='fiado'&&!v.fiadoPagado) stats[v.cliente].fiado += neto(v);
+    stats[v.cliente].fiado += montoPendienteV(v);
   });
 
-  const sorted = Object.entries(stats).sort((a,b)=>b[1].total-a[1].total);
+  // Debtors first, then by total
+  const sorted = Object.entries(stats).sort((a,b) => {
+    if (b[1].fiado !== a[1].fiado) return b[1].fiado - a[1].fiado;
+    return b[1].total - a[1].total;
+  });
 
   if (!sorted.length) {
     return '<div class="empty"><div class="empty-ico">👥</div>Registra ventas para ver el historial de clientes</div>';
   }
 
-  const totalFiadoGlobal = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+neto(v),0);
+  const totalFiadoGlobal = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado)
+    .reduce((s,v)=>s+montoPendienteV(v),0);
+  const clientesConDeuda = sorted.filter(([,s])=>s.fiado>0).length;
 
   return `
     ${totalFiadoGlobal>0 ? `
-    <div class="fiado-banner">
-      <div><div class="fiado-banner-lbl">📋 Fiado total pendiente</div></div>
-      <div class="fiado-banner-val">${fmt(totalFiadoGlobal)}</div>
+    <div style="background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.35);border-radius:var(--radius);
+      padding:12px 13px;margin-bottom:11px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:.82em;font-weight:700;color:var(--red)">💳 Cuentas por cobrar</div>
+        <div style="font-size:.76em;color:var(--muted);margin-top:2px">${clientesConDeuda} cliente${clientesConDeuda!==1?'s':''} con deuda</div>
+      </div>
+      <div style="font-size:1.1em;font-weight:700;color:var(--red)">${fmt(totalFiadoGlobal)}</div>
     </div>` : ''}
 
     <div class="section-title">${sorted.length} clientes</div>
-    ${sorted.map(([nombre, s]) => `
+    ${sorted.map(([nombre, s]) => {
+      const riesgo = perfilRiesgo(nombre);
+      return `
       <div class="cli-card" onclick="verCliente('${esc(nombre)}')">
         <div class="cli-card-top">
-          <div class="cli-card-name">👤 ${esc(nombre)}</div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div class="cli-card-name">👤 ${esc(nombre)}</div>
+            ${s.fiado>0 ? `<span class="badge badge-red" style="font-size:.66em">${riesgo.label}</span>` :
+              riesgo.label==='Al día'&&s.total>0 ? '' : ''}
+          </div>
           <div class="cli-card-total">${fmt(s.total)}</div>
         </div>
-        <div class="cli-card-meta">
-          ${s.count} compra${s.count!==1?'s':''} · Última: ${fmtFecha(s.ultima)}
-          ${s.fiado>0 ? `<span class="badge-warn badge" style="margin-left:6px">Fiado ${fmt(s.fiado)}</span>`:''}
+        <div class="cli-card-meta" style="display:flex;justify-content:space-between;align-items:center">
+          <span>${s.count} compra${s.count!==1?'s':''} · Última: ${fmtFecha(s.ultima)}
+          ${s.fiado>0 ? `<span class="badge-warn badge" style="margin-left:6px">Debe ${fmt(s.fiado)}</span>`:''}
+          </span>
+          ${s.fiado>0 ? `<button class="btn-sm" style="background:var(--gdim);color:var(--green);border:1px solid rgba(63,185,80,.3);margin-left:8px;flex-shrink:0"
+            onclick="event.stopPropagation();abrirCobro(primerFiadoPendiente('${esc(nombre)}'))">💰 Cobrar</button>` : ''}
         </div>
-      </div>`).join('')}
+      </div>`;
+    }).join('')}
   `;
+}
+
+function primerFiadoPendiente(nombre) {
+  const v = DB.ventas.find(v => v.cliente===nombre && v.pago==='fiado' && !v.fiadoPagado && montoPendienteV(v)>0);
+  return v ? v.id : null;
 }
 
 function verCliente(nombre) {
@@ -1165,8 +1282,10 @@ function periodoKey(v, modo) {
 function renderHistorialCliente(nombre) {
   const ventas = DB.ventas.filter(v=>v.cliente===nombre).sort((a,b)=>b.ts-a.ts);
   const total  = ventas.reduce((s,v)=>s+neto(v),0);
-  const fiado  = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+neto(v),0);
+  const fiado  = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+montoPendienteV(v),0);
   const devol  = ventas.reduce((s,v)=>s+devTotal(v),0);
+  const riesgo = perfilRiesgo(nombre);
+  const fiadosPend = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado&&montoPendienteV(v)>0);
 
   const prodsTotal = {};
   ventas.forEach(v=>v.items.forEach(it=>{
@@ -1189,13 +1308,51 @@ function renderHistorialCliente(nombre) {
 
     <div class="card">
       <div class="card-title">👤 ${esc(nombre)}</div>
-      <div class="stats" style="margin-bottom:0">
-        <div class="stat green"><div class="stat-val">${fmt(total)}</div><div class="stat-lbl">Total gastado</div></div>
+      <div class="stats" style="margin-bottom:9px">
+        <div class="stat green"><div class="stat-val">${fmt(total)}</div><div class="stat-lbl">Total comprado</div></div>
         <div class="stat accent"><div class="stat-val">${ventas.length}</div><div class="stat-lbl">Compras</div></div>
       </div>
-      ${fiado>0 ? `<div style="margin-top:9px;padding:8px;background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);border-radius:8px;font-size:.82em;color:var(--warn)">📋 Fiado pendiente: <b>${fmt(fiado)}</b></div>` : ''}
+      <!-- Perfil de riesgo -->
+      <div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-size:.78em;color:var(--muted);margin-bottom:3px">Perfil de riesgo</div>
+          <div class="risk-bar"><div class="risk-bar-fill" style="width:${riesgo.score}%;background:${riesgo.color}"></div></div>
+        </div>
+        <span class="badge ${riesgo.cls}" style="flex-shrink:0">${riesgo.label}</span>
+      </div>
       ${devol>0 ? `<div style="margin-top:7px;padding:8px;background:var(--rdim);border:1px solid rgba(248,81,73,.3);border-radius:8px;font-size:.82em;color:var(--red)">↩️ Devoluciones/averías: <b>${fmt(devol)}</b></div>` : ''}
     </div>
+
+    ${fiadosPend.length ? `
+    <div class="card" style="border-color:rgba(248,81,73,.3);background:rgba(248,81,73,.04)">
+      <div class="card-title" style="color:var(--red)">💳 Deudas pendientes · ${fmt(fiado)}</div>
+      ${fiadosPend.map(v => {
+        const pend   = montoPendienteV(v);
+        const pagado = montoPagadoItems(v);
+        return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+            <div>
+              <span style="font-size:.84em;font-weight:700">Rec #${String(v.numRecibo||0).padStart(4,'0')}</span>
+              <span style="font-size:.76em;color:var(--muted);margin-left:7px">${fmtFecha(v.fecha)}</span>
+            </div>
+            <span style="font-weight:700;color:var(--red)">${fmt(pend)}</span>
+          </div>
+          ${v.items.map((it,i)=>{
+            const paid=(v.itemsPagados||[]).includes(i);
+            return `<div style="display:flex;justify-content:space-between;font-size:.8em;padding:2px 0;
+              color:${paid?'var(--muted)':'var(--text)'}">
+              <span>${paid?'<s>':''}${esc(it.prod)} ×${fmtCant(it.cant)}${DB.unidades[it.prod]?' '+esc(DB.unidades[it.prod]):''}${paid?'</s> ✓':''}</span>
+              <span style="color:${paid?'var(--muted)':'var(--warn)'}">${paid?'<s>':''}${fmt(it.cant*it.precio)}${paid?'</s>':''}</span>
+            </div>`;
+          }).join('')}
+          ${pagado>0&&pend>0 ? `<div style="font-size:.76em;color:var(--muted);margin-top:4px">Abonado: ${fmt(pagado)}</div>` : ''}
+          <button class="btn btn-green" style="margin-top:9px;font-size:.85em"
+            onclick="abrirCobro('${esc(v.id)}')">💰 Cobrar esta factura</button>
+        </div>`;
+      }).join('')}
+    </div>` : `
+    ${total>0 ? `<div style="background:var(--gdim);border:1px solid rgba(63,185,80,.3);border-radius:var(--radius);padding:10px 13px;margin-bottom:11px;font-size:.84em;color:var(--green);font-weight:600">✅ Sin deudas pendientes</div>` : ''}
+    `}
 
     ${topProds.length ? `
     <div class="card">
@@ -1251,13 +1408,20 @@ function verDetalle(id) {
   enc.appendChild(nm); enc.appendChild(fe);
   body.appendChild(enc);
 
-  v.items.forEach(it => {
+  const esF = v.pago === 'fiado' && !v.fiadoPagado && Array.isArray(v.itemsPagados);
+  v.items.forEach((it, i) => {
     const row = document.createElement('div');
     row.className = 'resumen-prod';
     const u = DB.unidades[it.prod]||'';
+    const paid = esF ? (v.itemsPagados||[]).includes(i) : null;
     const l = document.createElement('span');
-    l.textContent = it.prod + ' ×' + fmtCant(it.cant) + (u?' '+u:'');
+    l.style.cssText = paid===false ? 'color:var(--warn)' : paid===true ? 'color:var(--muted)' : '';
+    l.innerHTML = (paid===true ? '<s>' : '') +
+      esc(it.prod + ' ×' + fmtCant(it.cant) + (u?' '+u:'')) +
+      (paid===true ? '</s> <span style="color:var(--green);font-size:.82em">✓ cobrado</span>' : '') +
+      (paid===false ? ' <span style="font-size:.76em">⏳ pendiente</span>' : '');
     const r = document.createElement('span');
+    r.style.cssText = paid===false ? 'color:var(--warn);font-weight:700' : paid===true ? 'color:var(--muted)' : '';
     r.textContent = fmt(it.cant * it.precio);
     row.appendChild(l); row.appendChild(r);
     body.appendChild(row);
@@ -1293,6 +1457,24 @@ function verDetalle(id) {
   tr.appendChild(tl); tr.appendChild(tv);
   body.appendChild(tr);
 
+  // Partial payment summary for fiado
+  if (v.pago === 'fiado' && !v.fiadoPagado) {
+    const pend = montoPendienteV(v);
+    const pag  = montoPagadoItems(v);
+    if (pag > 0) {
+      const pr = document.createElement('div'); pr.className='resumen-prod'; pr.style.color='var(--muted)';
+      const pl=document.createElement('span'); pl.textContent='Cobrado';
+      const pv=document.createElement('span'); pv.style.color='var(--green)'; pv.textContent=fmt(pag);
+      pr.appendChild(pl); pr.appendChild(pv); body.appendChild(pr);
+    }
+    if (pend > 0) {
+      const dr = document.createElement('div'); dr.className='resumen-total'; dr.style.cssText='border-top:1px solid rgba(248,81,73,.3);margin-top:5px;padding-top:7px';
+      const dl=document.createElement('span'); dl.style.color='var(--red)'; dl.textContent='⏳ Pendiente';
+      const dv=document.createElement('span'); dv.style.cssText='color:var(--red);font-size:1.05em'; dv.textContent=fmt(pend);
+      dr.appendChild(dl); dr.appendChild(dv); body.appendChild(dr);
+    }
+  }
+
   if (v.numRecibo) {
     const rn = document.createElement('div');
     rn.style.cssText='font-size:.76em;color:var(--muted);margin-top:5px';
@@ -1316,9 +1498,114 @@ function marcarFiadoPagado() {
   const v = DB.ventas.find(x=>x.id===ventaSelId);
   if (!v) return;
   v.fiadoPagado = true;
+  v.itemsPagados = v.items.map((_,i) => i);
   guardar();
   closeModal('m-detalle');
   toast('✅ Fiado marcado como pagado');
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════
+// COBROS PARCIALES
+// ═══════════════════════════════════════════════════════════
+function abrirCobro(ventaId) {
+  if (!ventaId) { toast('No hay factura pendiente', true); return; }
+  const v = DB.ventas.find(x => x.id === ventaId);
+  if (!v) { toast('Factura no encontrada', true); return; }
+  cobroVentaId = ventaId;
+  const pagados = v.itemsPagados || [];
+  cobroItems = [...pagados];
+  pintarCobroForm();
+  openModal('m-cobrar');
+}
+
+function pintarCobroForm() {
+  const v = DB.ventas.find(x => x.id === cobroVentaId);
+  if (!v) return;
+  const el = document.getElementById('m-cobrar-body');
+  if (!el) return;
+  const pagados = v.itemsPagados || [];
+  const totalV  = neto(v);
+  const cobrado = montoPagadoItems(v);
+  const pendiente = montoPendienteV(v);
+
+  const itemRows = v.items.map((it, i) => {
+    const u       = DB.unidades[it.prod] || '';
+    const yaPagado= pagados.includes(i);
+    const checked = cobroItems.includes(i);
+    return `<label class="cobrar-row" style="${yaPagado?'opacity:.55;pointer-events:none':'cursor:pointer'}">
+      <input type="checkbox" class="cobrar-check"
+        ${checked?'checked':''} ${yaPagado?'disabled':''}
+        onchange="toggleCobroItem(${i},this.checked)">
+      <div style="flex:1">
+        <div style="font-size:.9em;font-weight:600">${esc(it.prod)} ×${fmtCant(it.cant)}${u?' '+esc(u):''}</div>
+        <div style="font-size:.76em;color:var(--muted)">${fmt(it.cant*it.precio)}</div>
+      </div>
+      ${yaPagado ? '<span class="badge badge-green" style="font-size:.68em;flex-shrink:0">✓ Cobrado</span>' :
+        '<span style="font-size:.76em;color:var(--warn);flex-shrink:0">pendiente</span>'}
+    </label>`;
+  }).join('');
+
+  const nuevosIdx = cobroItems.filter(i => !pagados.includes(i));
+  const montoNuevo = v.items.reduce((s,it,i) => nuevosIdx.includes(i)?s+Math.round(it.cant*it.precio):s, 0);
+
+  el.innerHTML = `
+    <div style="font-size:.83em;color:var(--muted);margin-bottom:12px">
+      👤 <b style="color:var(--text)">${esc(v.cliente)}</b> · Rec #${String(v.numRecibo||0).padStart(4,'0')} · ${fmtFecha(v.fecha)}<br>
+      <span style="color:var(--warn)">⏳ Pendiente: <b>${fmt(pendiente)}</b></span>
+      ${cobrado>0?` · <span style="color:var(--green)">✓ Ya cobrado: ${fmt(cobrado)}</span>`:''}
+    </div>
+    <div style="font-size:.8em;color:var(--muted);margin-bottom:8px">Selecciona qué está pagando ahora:</div>
+    ${itemRows}
+    <div class="total-bar" style="margin-top:13px">
+      <div><div style="font-size:.76em;color:var(--muted)">A cobrar en este pago</div></div>
+      <div class="total-bar-val" id="cobro-monto" style="color:var(--green)">${fmt(montoNuevo)}</div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:10px">
+      <button class="btn btn-green" style="flex:1" onclick="guardarCobro()">✅ Confirmar cobro</button>
+    </div>
+    <button class="btn btn-surface" style="margin-top:7px;font-size:.86em" onclick="cobrarTodo()">⚡ Cobrar todo</button>`;
+}
+
+function toggleCobroItem(idx, checked) {
+  if (checked) { if (!cobroItems.includes(idx)) cobroItems.push(idx); }
+  else { cobroItems = cobroItems.filter(i => i !== idx); }
+  // Re-add already-paid items (they don't change)
+  const v = DB.ventas.find(x => x.id === cobroVentaId);
+  if (v) {
+    (v.itemsPagados||[]).forEach(i => { if (!cobroItems.includes(i)) cobroItems.push(i); });
+    const pagados = v.itemsPagados||[];
+    const nuevosIdx = cobroItems.filter(i => !pagados.includes(i));
+    const montoNuevo = v.items.reduce((s,it,i)=>nuevosIdx.includes(i)?s+Math.round(it.cant*it.precio):s,0);
+    const el = document.getElementById('cobro-monto');
+    if (el) el.textContent = fmt(montoNuevo);
+  }
+}
+
+function guardarCobro() {
+  const v = DB.ventas.find(x => x.id === cobroVentaId);
+  if (!v) return;
+  const prevPagados = v.itemsPagados || [];
+  const nuevos = cobroItems.filter(i => !prevPagados.includes(i));
+  if (!nuevos.length) { toast('Selecciona al menos un producto para cobrar', true); return; }
+  v.itemsPagados = [...new Set([...prevPagados, ...cobroItems])];
+  if (v.itemsPagados.length >= v.items.length) {
+    v.fiadoPagado = true;
+    toast('✅ Factura cobrada por completo');
+  } else {
+    const cobrado = montoPagadoItems(v);
+    toast('💰 Cobro registrado · ' + fmt(cobrado));
+  }
+  guardar(); vibrar(); closeModal('m-cobrar'); render();
+}
+
+function cobrarTodo() {
+  const v = DB.ventas.find(x => x.id === cobroVentaId);
+  if (!v) return;
+  v.itemsPagados = v.items.map((_,i) => i);
+  v.fiadoPagado  = true;
+  guardar(); vibrar(); closeModal('m-cobrar');
+  toast('✅ Factura cobrada por completo');
   render();
 }
 
@@ -1639,7 +1926,7 @@ function calcStats(ventas) {
   const total  = ventas.reduce((s,v)=>s+neto(v),0);
   const clis   = [...new Set(ventas.map(v=>v.cliente))];
   const prods  = {};
-  const fiados = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+neto(v),0);
+  const fiados = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+montoPendienteV(v),0);
   ventas.forEach(v=>v.items.forEach(it=>{ prods[it.prod]=(prods[it.prod]||0)+it.cant; }));
   return { total, count:ventas.length, clis, prods, fiados };
 }
@@ -1690,7 +1977,7 @@ function renderInforme() {
   const topCli = Object.entries(cliStats).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const maxCli = Math.max(1,...topCli.map(([,t])=>t));
 
-  const fiadoTotal = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+neto(v),0);
+  const fiadoTotal = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+montoPendienteV(v),0);
 
   const fPers = compareMode==='custom' ? `
     <div class="card">
@@ -1846,8 +2133,8 @@ function renderAjustes() {
   const palNombres = { blue:'Azul', green:'Verde', purple:'Morado', orange:'Naranja', red:'Rojo' };
   const palColores = { blue:'#4493f8', green:'#3fb950', purple:'#a371f7', orange:'#f0883e', red:'#e05252' };
 
-  const fiadosPend  = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado);
-  const totalFiado  = fiadosPend.reduce((s,v)=>s+neto(v),0);
+  const fiadosPend  = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado&&montoPendienteV(v)>0);
+  const totalFiado  = fiadosPend.reduce((s,v)=>s+montoPendienteV(v),0);
 
   return `
     <!-- Logo y negocio -->
@@ -2138,6 +2425,11 @@ function generarReciboTexto(v) {
       fila('TOTAL:', fmt(v.total)),
     ]),
     fila('Pago:', pagoLabel[v.pago]||v.pago||''),
+    ...(v.pago==='fiado'&&!v.fiadoPagado&&montoPagadoItems(v)>0 ? [
+      rep('─',W),
+      fila('Cobrado:', fmt(montoPagadoItems(v))),
+      fila('PENDIENTE:', fmt(montoPendienteV(v))),
+    ] : []),
     ...(v.nota ? [rep('─',W), 'Nota: '+v.nota.slice(0,W-6)] : []),
     rep('═',W),
     cen('¡Gracias por su compra!'),
@@ -2167,9 +2459,12 @@ function generarReciboHTML(v) {
     rep('─',W),
     fila('PRODUCTO','PRECIO'),
     rep('─',W),
-    ...v.items.map(it => {
-      const u = DB.unidades[it.prod]||'';
-      const l = (it.prod+' x'+fmtCant(it.cant)+(u?' '+u:'')).slice(0,W-10);
+    ...v.items.map((it,i) => {
+      const u    = DB.unidades[it.prod]||'';
+      const esFP = v.pago==='fiado'&&!v.fiadoPagado&&Array.isArray(v.itemsPagados);
+      const paid = esFP ? (v.itemsPagados||[]).includes(i) : null;
+      const mark = paid===true ? '[PAG] ' : paid===false ? '[DEB] ' : '';
+      const l    = (mark+it.prod+' x'+fmtCant(it.cant)+(u?' '+u:'')).slice(0,W-10);
       return fila(l, fmt(it.cant*it.precio));
     }),
     rep('─',W),
@@ -2182,6 +2477,11 @@ function generarReciboHTML(v) {
       b(fila('TOTAL:', fmt(v.total))),
     ]),
     fila('Pago:', pl[v.pago]||v.pago||''),
+    ...(v.pago==='fiado'&&!v.fiadoPagado&&montoPagadoItems(v)>0 ? [
+      rep('─',W),
+      fila('Cobrado:', fmt(montoPagadoItems(v))),
+      b(fila('PENDIENTE:', fmt(montoPendienteV(v)))),
+    ] : []),
     ...(v.nota ? [rep('─',W), esc('Nota: '+v.nota).slice(0,W)] : []),
     rep('═',W),
     cen('¡Gracias por su compra!'),
@@ -2484,7 +2784,7 @@ function render() {
   else if (paginaActual==='documentos')  app.innerHTML = renderDocumentos();
   actualizarHeaderTotal();
   const fab = document.getElementById('calc-fab');
-  if (fab) fab.style.display = ['ajustes','inventario','documentos'].includes(paginaActual) ? 'none' : 'flex';
+  if (fab) fab.style.display = ['ajustes','inventario','documentos','clientes'].includes(paginaActual) ? 'none' : 'flex';
   requestAnimationFrame(()=>app.classList.add('page-in'));
 }
 
