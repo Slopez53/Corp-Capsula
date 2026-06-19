@@ -296,9 +296,9 @@ textarea{resize:none;height:64px;line-height:1.5}
 @media print{
   body>*:not(#print-zone){display:none!important}
   #print-zone{display:block!important;font-family:'Courier New',monospace;
-    font-size:12pt;color:#000;background:#fff;width:72mm;margin:0 auto;padding:4mm;}
+    font-size:16pt;color:#000;background:#fff;width:72mm;margin:0 auto;padding:3mm;}
   #print-zone *{color:#000!important;background:transparent!important}
-  .pr{white-space:pre;line-height:1.6;font-family:'Courier New',monospace}
+  .pr{white-space:pre;line-height:1.8;font-family:'Courier New',monospace}
 }
 #print-zone{display:none}
 /* UNIT TAG */
@@ -2017,7 +2017,7 @@ function exportarJSON() {
 // RECIBO / IMPRESIÓN
 // ═══════════════════════════════════════════════════════════
 function generarReciboTexto(v) {
-  const W   = 32;
+  const W   = 26;
   const neg = (DB.config.negocio||'Mis Ventas').toUpperCase().slice(0,W);
   const tel = DB.config.telefono || '';
   function rep(c,n)  { return c.repeat(Math.max(0,n)); }
