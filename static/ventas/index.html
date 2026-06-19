@@ -45,7 +45,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .hdr-total{font-size:.82em;font-weight:700;color:var(--green)}
 .hdr-lbl{font-size:.68em;color:var(--muted)}
 /* APP */
-#app{flex:1;overflow-y:auto;padding:12px 12px 100px}
+#app{flex:1;overflow-y:auto;padding:12px 12px 130px}
 /* PAGE TRANSITION */
 @keyframes pageIn{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
 #app.page-in{animation:pageIn .22s cubic-bezier(.34,1.2,.64,1) both}
@@ -55,22 +55,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));
   transition:opacity .12s ease;}
 #page-overlay.flash{opacity:1}
-/* NAV */
-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);
-  width:100%;max-width:480px;background:var(--glass-nav-bg);
-  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
-  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
-  display:flex;border-top:1px solid var(--border);z-index:20;
-  padding-bottom:env(safe-area-inset-bottom,0);}
+/* DOCK NAV */
+nav{position:fixed;bottom:max(16px,env(safe-area-inset-bottom,16px));
+  left:50%;transform:translateX(-50%);
+  width:calc(100% - 28px);max-width:440px;
+  background:var(--dock-bg,rgba(13,17,23,.75));
+  backdrop-filter:blur(var(--dock-blur,22px)) saturate(180%);
+  -webkit-backdrop-filter:blur(var(--dock-blur,22px)) saturate(180%);
+  display:flex;border-radius:28px;z-index:20;padding:6px 4px;
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 8px 32px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.07);}
 nav button{flex:1;border:none;background:none;color:var(--muted);
-  padding:8px 2px 10px;display:flex;flex-direction:column;align-items:center;
-  gap:2px;font-size:.62em;cursor:pointer;transition:color .2s;position:relative;}
-nav button.active{color:var(--accent)}
-nav button.active::before{content:'';position:absolute;top:0;left:50%;
-  transform:translateX(-50%);width:24px;height:2px;border-radius:2px;
-  background:linear-gradient(90deg,var(--accent),var(--accent2));}
+  padding:7px 4px 8px;display:flex;flex-direction:column;align-items:center;
+  gap:2px;font-size:.6em;cursor:pointer;transition:all .2s;
+  border-radius:22px;font-family:inherit;}
+nav button.active{color:var(--accent);background:var(--adim)}
 nav button .ico{font-size:1.4em;transition:transform .2s}
-nav button.active .ico{transform:scale(1.1)}
+nav button.active .ico{transform:scale(1.12)}
+/* MÁS MENÚ GRID */
+.mas-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 0 8px}
+.mas-btn{border:none;background:var(--sfc2);border-radius:var(--radius);
+  padding:18px 10px;display:flex;flex-direction:column;align-items:center;
+  gap:7px;cursor:pointer;border:1px solid var(--border);
+  transition:background .15s;font-family:inherit;width:100%;}
+.mas-btn:active{opacity:.75}
+.mas-ico{font-size:1.9em}
+.mas-lbl{font-size:.86em;font-weight:600;color:var(--text)}
 /* CARDS */
 .card{background:var(--glass-card-bg);border:1px solid var(--border);
   backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
@@ -215,7 +225,7 @@ textarea{resize:none;height:64px;line-height:1.5}
 .resumen-total{display:flex;justify-content:space-between;font-weight:700;
   font-size:1.02em;padding:9px 0 2px;}
 /* TOAST */
-.toast{position:fixed;bottom:88px;left:50%;
+.toast{position:fixed;bottom:118px;left:50%;
   transform:translateX(-50%) translateY(16px);
   background:var(--green);color:#0d1117;padding:9px 20px;
   border-radius:30px;font-weight:700;font-size:.86em;
@@ -252,7 +262,7 @@ textarea{resize:none;height:64px;line-height:1.5}
 .fiado-banner-lbl{font-size:.8em;color:var(--warn);font-weight:600}
 .fiado-banner-val{font-size:1.08em;font-weight:700;color:var(--warn)}
 /* CALCULATOR FAB */
-#calc-fab{position:fixed;right:14px;bottom:88px;z-index:30;
+#calc-fab{position:fixed;right:14px;bottom:120px;z-index:30;
   width:46px;height:46px;border-radius:50%;border:none;
   background:var(--sfc2);color:var(--text);font-size:1.2em;
   cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.35);
@@ -296,7 +306,7 @@ textarea{resize:none;height:64px;line-height:1.5}
 @media print{
   body>*:not(#print-zone){display:none!important}
   #print-zone{display:block!important;font-family:'Courier New',monospace;
-    font-size:16pt;color:#000;background:#fff;width:72mm;margin:0 auto;padding:3mm;}
+    font-size:18pt;color:#000;background:#fff;width:72mm;margin:0 auto;padding:3mm;}
   #print-zone *{color:#000!important;background:transparent!important}
   .pr{white-space:pre;line-height:1.8;font-family:'Courier New',monospace}
 }
@@ -341,10 +351,8 @@ textarea{resize:none;height:64px;line-height:1.5}
   <button class="active" id="nav-venta" onclick="goTo('venta')"><span class="ico">➕</span>Nueva</button>
   <button id="nav-hoy" onclick="goTo('hoy')"><span class="ico">📅</span>Hoy</button>
   <button id="nav-ventas" onclick="goTo('ventas')"><span class="ico">📋</span>Ventas</button>
-  <button id="nav-clientes" onclick="goTo('clientes')"><span class="ico">👥</span>Clientes</button>
-  <button id="nav-devol" onclick="goTo('devol')"><span class="ico">↩️</span>Devol.</button>
   <button id="nav-informe" onclick="goTo('informe')"><span class="ico">📊</span>Informe</button>
-  <button id="nav-ajustes" onclick="goTo('ajustes')"><span class="ico">⚙️</span>Ajustes</button>
+  <button id="nav-mas" onclick="abrirMas()"><span class="ico">⋯</span>Más</button>
 </nav>
 
 <button id="calc-fab" onclick="abrirCalc()" title="Calculadora">🧮</button>
@@ -407,6 +415,25 @@ textarea{resize:none;height:64px;line-height:1.5}
     <button class="modal-close" onclick="closeModal('m-devol')">✕</button>
     <div class="modal-title">↩️ Registrar devolución / avería</div>
     <div id="m-devol-body"></div>
+  </div>
+</div>
+
+<!-- Modal: más opciones -->
+<div class="modal-bg" id="m-mas" onclick="bgClose(event,'m-mas')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Menú</div>
+    <div class="mas-grid">
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('clientes')">
+        <span class="mas-ico">👥</span><span class="mas-lbl">Clientes</span>
+      </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('devol')">
+        <span class="mas-ico">↩️</span><span class="mas-lbl">Devoluciones</span>
+      </button>
+      <button class="mas-btn" style="grid-column:1/-1" onclick="closeModal('m-mas');goTo('ajustes')">
+        <span class="mas-ico">⚙️</span><span class="mas-lbl">Ajustes</span>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -481,20 +508,21 @@ function applyGlass() {
   const r    = document.documentElement.style;
   const g    = GLASS_PRESETS[DB.config.glassIntensity] || GLASS_PRESETS.off;
   const dark = DB.config.darkMode !== false;
+  // Dock always has glass (independent of user setting)
+  const dBase = dark ? '13,17,23' : '246,248,250';
+  r.setProperty('--dock-bg',   `rgba(${dBase},0.72)`);
+  r.setProperty('--dock-blur', '22px');
   r.setProperty('--glass-blur', g.blur);
   r.setProperty('--glass-sat', g.sat);
   if (g.cardA === null) {
     r.setProperty('--glass-card-bg', 'var(--sfc)');
-    r.setProperty('--glass-nav-bg',  'var(--sfc)');
     r.setProperty('--glass-hdr-bg',  'var(--sfc)');
     r.setProperty('--glass-overlay-alpha', '0');
   } else {
-    const cBase = dark ? '22,27,34'    : '255,255,255';
-    const nBase = dark ? '13,17,23'    : '246,248,250';
-    const nA    = Math.min(g.cardA + 0.1, 0.95);
+    const cBase = dark ? '22,27,34' : '255,255,255';
+    const nBase = dark ? '13,17,23' : '246,248,250';
     r.setProperty('--glass-card-bg', `rgba(${cBase},${g.cardA})`);
-    r.setProperty('--glass-nav-bg',  `rgba(${nBase},${nA})`);
-    r.setProperty('--glass-hdr-bg',  `rgba(${nBase},${nA})`);
+    r.setProperty('--glass-hdr-bg',  `rgba(${nBase},${Math.min(g.cardA+0.1,0.95)})`);
     r.setProperty('--glass-overlay-alpha', String(dark ? 0.08 : 0.06));
   }
 }
@@ -516,6 +544,7 @@ let DB = {
     darkMode:       true,
     logo:           '',
     glassIntensity: 'off',
+    firma:          '',
   },
   productos: ['Salchichas','Chorizo','Jamón','Mortadela','Salami','Tocino','Longaniza','Butifarra'],
   unidades:  {},
@@ -652,18 +681,23 @@ function mesPasado()  {
 // ═══════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════
+const MAS_PAGES = ['clientes','devol','ajustes'];
+
 function goTo(p) {
   leerFormVenta();
   if (p !== 'clientes') clienteVisto = null;
   paginaActual = p;
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  document.getElementById('nav-'+p)?.classList.add('active');
+  const navId = MAS_PAGES.includes(p) ? 'nav-mas' : ('nav-'+p);
+  document.getElementById(navId)?.classList.add('active');
   if (DB.config.glassIntensity !== 'off') {
     const ov = document.getElementById('page-overlay');
     if (ov) { ov.classList.add('flash'); setTimeout(()=>ov.classList.remove('flash'),180); }
   }
   render();
 }
+
+function abrirMas() { openModal('m-mas'); }
 
 // ═══════════════════════════════════════════════════════════
 // NUEVA VENTA
@@ -1785,10 +1819,15 @@ function renderAjustes() {
         <input type="text" placeholder="Mis Ventas de Embutidos" value="${esc(DB.config.negocio)}"
           oninput="DB.config.negocio=this.value;guardar();actualizarNegocio()">
       </div>
-      <div>
+      <div style="margin-top:9px">
         <label class="input-label">Teléfono (recibo)</label>
         <input type="tel" placeholder="300 123 4567" value="${esc(DB.config.telefono)}"
           oninput="DB.config.telefono=this.value;guardar()">
+      </div>
+      <div style="margin-top:9px">
+        <label class="input-label">Firma en recibo (nombre o cargo)</label>
+        <input type="text" placeholder="Ej: Juan García · Propietario" value="${esc(DB.config.firma||'')}"
+          oninput="DB.config.firma=this.value;guardar()">
       </div>
     </div>
 
@@ -2059,14 +2098,60 @@ function generarReciboTexto(v) {
   return lineas.join('\n');
 }
 
+function generarReciboHTML(v) {
+  const W    = 26;
+  const neg  = (DB.config.negocio||'Mis Ventas').toUpperCase().slice(0,W);
+  const tel  = DB.config.telefono || '';
+  const firma= (DB.config.firma || '').slice(0,W);
+  function rep(c,n)  { return c.repeat(Math.max(0,n)); }
+  function cen(s)    { const p=Math.max(0,Math.floor((W-s.length)/2)); return rep(' ',p)+esc(s); }
+  function fila(l,r) { const sp=Math.max(1,W-l.length-r.length); return esc(l)+rep(' ',sp)+esc(r); }
+  function b(s)      { return '<b>'+s+'</b>'; }
+  const pl = { efectivo:'Efectivo', transferencia:'Transfer.', fiado:'Fiado', otro:'Otro' };
+  const lines = [
+    rep('═',W),
+    b(cen(neg)),
+    ...(tel ? [cen('Tel: '+tel)] : []),
+    rep('─',W),
+    b('Recibo #'+String(v.numRecibo||0).padStart(4,'0')),
+    esc('Fecha: '+fmtFecha(v.fecha)+' '+fmtHora(v.ts)).slice(0,W),
+    b(fila('Cliente:', v.cliente.slice(0,W-10))),
+    rep('─',W),
+    fila('PRODUCTO','PRECIO'),
+    rep('─',W),
+    ...v.items.map(it => {
+      const u = DB.unidades[it.prod]||'';
+      const l = (it.prod+' x'+fmtCant(it.cant)+(u?' '+u:'')).slice(0,W-10);
+      return fila(l, fmt(it.cant*it.precio));
+    }),
+    rep('─',W),
+    ...(devTotal(v)>0 ? [
+      fila('Subtotal:', fmt(v.total)),
+      ...(v.devoluciones||[]).map(d =>
+        fila((d.tipo==='averia'?'Averia ':'Devol ')+d.prod.slice(0,W-14), '-'+fmt(d.monto))),
+      b(fila('TOTAL:', fmt(neto(v)))),
+    ] : [
+      b(fila('TOTAL:', fmt(v.total))),
+    ]),
+    fila('Pago:', pl[v.pago]||v.pago||''),
+    ...(v.nota ? [rep('─',W), esc('Nota: '+v.nota).slice(0,W)] : []),
+    rep('═',W),
+    cen('¡Gracias por su compra!'),
+    rep('═',W),
+    ...(firma ? ['', rep('_',W), b(cen(firma)), cen('Firma')] : []),
+  ];
+  return lines.join('\n');
+}
+
 function mostrarReciboVenta(venta) {
-  const txt = generarReciboTexto(venta);
+  const txt  = generarReciboTexto(venta);
+  const html = generarReciboHTML(venta);
   reciboTxt  = txt;
   ventaSelId = venta.id;
   const prev = document.getElementById('recibo-preview');
   if (prev) prev.textContent = txt;
   const pz = document.getElementById('print-content');
-  if (pz) pz.textContent = txt;
+  if (pz) pz.innerHTML = html;
   openModal('m-recibo');
 }
 
