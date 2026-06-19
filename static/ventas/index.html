@@ -47,8 +47,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 /* APP */
 #app{flex:1;overflow-y:auto;padding:12px 12px 130px}
 /* PAGE TRANSITION */
-@keyframes pageIn{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
-#app.page-in{animation:pageIn .22s cubic-bezier(.34,1.2,.64,1) both}
+@keyframes pageIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+#app.page-in{animation:pageIn .24s cubic-bezier(.25,.46,.45,.94) both}
+/* DOCK BOUNCE */
+@keyframes dockPop{0%{transform:scale(1)}40%{transform:scale(1.42)}70%{transform:scale(1.22)}100%{transform:scale(1.28)}}
+.dock-pop{animation:dockPop .35s cubic-bezier(.34,1.56,.64,1) forwards!important}
 /* GLASS OVERLAY */
 #page-overlay{position:fixed;inset:0;z-index:14;opacity:0;pointer-events:none;
   background:rgba(200,220,255,var(--glass-overlay-alpha));
@@ -66,21 +69,34 @@ nav{position:fixed;bottom:max(16px,env(safe-area-inset-bottom,16px));
   border:1px solid rgba(255,255,255,.1);
   box-shadow:0 8px 32px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.07);}
 nav button{flex:1;border:none;background:none;color:var(--muted);
-  padding:7px 4px 8px;display:flex;flex-direction:column;align-items:center;
-  gap:2px;font-size:.6em;cursor:pointer;transition:all .2s;
-  border-radius:22px;font-family:inherit;}
-nav button.active{color:var(--accent);background:var(--adim)}
-nav button .ico{font-size:1.4em;transition:transform .2s}
-nav button.active .ico{transform:scale(1.12)}
+  padding:6px 4px 7px;display:flex;flex-direction:column;align-items:center;
+  gap:2px;font-size:.6em;cursor:pointer;transition:color .2s,background .2s,transform .2s;
+  border-radius:22px;font-family:inherit;position:relative;-webkit-tap-highlight-color:transparent;}
+nav button.active{color:var(--accent);background:var(--adim);transform:translateY(-1px)}
+nav button.active::after{content:'';position:absolute;bottom:3px;width:4px;height:4px;
+  border-radius:50%;background:var(--accent);opacity:.8}
+nav button .ico{font-size:1.5em;transition:transform .3s cubic-bezier(.34,1.56,.64,1);display:block}
+nav button.active .ico{transform:scale(1.28)}
+nav button:active .ico{transform:scale(1.1)!important}
+.dock-lbl{transition:opacity .2s;line-height:1}
+body.no-dock-labels .dock-lbl{display:none}
+body.no-dock-labels nav button{padding:10px 4px}
 /* MÁS MENÚ GRID */
-.mas-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 0 8px}
-.mas-btn{border:none;background:var(--sfc2);border-radius:var(--radius);
-  padding:18px 10px;display:flex;flex-direction:column;align-items:center;
-  gap:7px;cursor:pointer;border:1px solid var(--border);
-  transition:background .15s;font-family:inherit;width:100%;}
-.mas-btn:active{opacity:.75}
-.mas-ico{font-size:1.9em}
-.mas-lbl{font-size:.86em;font-weight:600;color:var(--text)}
+.mas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:4px 0 8px}
+.mas-btn{border:none;background:var(--sfc2);border-radius:18px;
+  padding:16px 8px;display:flex;flex-direction:column;align-items:center;
+  gap:6px;cursor:pointer;border:1px solid var(--border);
+  transition:background .15s,transform .15s;font-family:inherit;width:100%;}
+.mas-btn:active{opacity:.75;transform:scale(.95)}
+.mas-btn:nth-child(1){animation-delay:.02s}
+.mas-btn:nth-child(2){animation-delay:.04s}
+.mas-btn:nth-child(3){animation-delay:.06s}
+.mas-btn:nth-child(4){animation-delay:.08s}
+.mas-btn:nth-child(5){animation-delay:.10s}
+.mas-btn:nth-child(6){animation-delay:.12s}
+.mas-btn:nth-child(7){animation-delay:.14s}
+.mas-ico{font-size:1.7em;line-height:1}
+.mas-lbl{font-size:.76em;font-weight:600;color:var(--text);line-height:1.2;text-align:center}
 /* CARDS */
 .card{background:var(--glass-card-bg);border:1px solid var(--border);
   backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
@@ -358,6 +374,31 @@ textarea{resize:none;height:64px;line-height:1.5}
 .toggle input:checked + .toggle-slider::before{transform:translateX(20px);background:var(--accent)}
 /* UNIT SELECT */
 .unit-select{padding:6px 8px;font-size:.78em;width:auto;border-radius:12px}
+/* COMPACT MODE */
+.card{padding:var(--card-pad,13px 13px);margin-bottom:var(--card-mb,11px)}
+/* GRADIENT ACCENT */
+body.accent-grad .btn-primary{background:var(--accent-grad,var(--accent))}
+body.accent-grad .hdr::after{background:var(--accent-grad)}
+body.accent-grad nav button.active{background:linear-gradient(135deg,rgba(68,147,248,.15),rgba(163,113,247,.15))}
+body.accent-grad .card-title::before{background:var(--accent-grad)}
+body.accent-grad .stat.accent{background:linear-gradient(135deg,rgba(68,147,248,.12),rgba(163,113,247,.08))}
+/* MODERN SCROLL */
+#app::-webkit-scrollbar{width:0}
+/* SMOOTH MODAL */
+@keyframes fadeModal{from{opacity:0}to{opacity:1}}
+@keyframes slideModal{from{transform:translateY(36px);opacity:.6}to{transform:translateY(0);opacity:1}}
+.modal-bg.open{display:flex;animation:fadeModal .2s ease both}
+.modal-bg.open .modal{animation:slideModal .26s cubic-bezier(.25,.46,.45,.94) both}
+/* VENTA ITEM hover glow */
+.venta-item:active{background:var(--sfc2);transform:scale(.99)}
+/* BACK BTN modern */
+.back-btn{display:flex;align-items:center;gap:6px;background:none;border:none;
+  color:var(--accent);font-size:.88em;cursor:pointer;font-family:inherit;
+  padding:0 0 14px;font-weight:700;transition:opacity .15s}
+.back-btn::before{content:'‹';font-size:1.4em;line-height:1}
+.back-btn:active{opacity:.6}
+/* SECTION TITLE decoration */
+.section-title::before{content:'';width:3px;height:13px;border-radius:2px;background:var(--accent);display:inline-block}
 </style>
 </head>
 <body>
@@ -381,11 +422,11 @@ textarea{resize:none;height:64px;line-height:1.5}
 <div id="print-zone"></div>
 
 <nav>
-  <button class="active" id="nav-venta" onclick="goTo('venta')"><span class="ico">➕</span>Nueva</button>
-  <button id="nav-hoy" onclick="goTo('hoy')"><span class="ico">📅</span>Hoy</button>
-  <button id="nav-ventas" onclick="goTo('ventas')"><span class="ico">📋</span>Ventas</button>
-  <button id="nav-informe" onclick="goTo('informe')"><span class="ico">📊</span>Informe</button>
-  <button id="nav-mas" onclick="abrirMas()"><span class="ico">⋯</span>Más</button>
+  <button class="active" id="nav-venta" onclick="goTo('venta')"><span class="ico">➕</span><span class="dock-lbl">Nueva</span></button>
+  <button id="nav-hoy" onclick="goTo('hoy')"><span class="ico">📅</span><span class="dock-lbl">Hoy</span></button>
+  <button id="nav-ventas" onclick="goTo('ventas')"><span class="ico">📋</span><span class="dock-lbl">Ventas</span></button>
+  <button id="nav-informe" onclick="goTo('informe')"><span class="ico">📊</span><span class="dock-lbl">Informe</span></button>
+  <button id="nav-mas" onclick="abrirMas()"><span class="ico">⋯</span><span class="dock-lbl">Más</span></button>
 </nav>
 
 <button id="calc-fab" onclick="abrirCalc()" title="Calculadora">🧮</button>
@@ -475,8 +516,14 @@ textarea{resize:none;height:64px;line-height:1.5}
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('documentos')">
         <span class="mas-ico">📷</span><span class="mas-lbl">Documentos</span>
       </button>
-      <button class="mas-btn" style="grid-column:1/-1" onclick="closeModal('m-mas');goTo('ajustes')">
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('ajustes')">
         <span class="mas-ico">⚙️</span><span class="mas-lbl">Ajustes</span>
+      </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');exportarJSON()">
+        <span class="mas-ico">📥</span><span class="mas-lbl">Backup</span>
+      </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');abrirCalc()">
+        <span class="mas-ico">🧮</span><span class="mas-lbl">Calc</span>
       </button>
     </div>
   </div>
@@ -599,6 +646,20 @@ function applyTheme() {
   r.setProperty('--rdim', 'rgba(248,81,73,.12)');
   r.setProperty('--red', '#f85149');
   r.setProperty('--warn', '#d29922');
+  // Compact mode spacing
+  r.setProperty('--card-pad', DB.config.compactMode ? '9px 11px' : '13px 13px');
+  r.setProperty('--card-mb',  DB.config.compactMode ? '7px' : '11px');
+  // Dock labels
+  document.body.classList.toggle('no-dock-labels', !DB.config.dockLabels);
+  // Gradient accent
+  if (DB.config.accentGrad) {
+    const g2 = pal.accent2 || pal.accent;
+    r.setProperty('--accent-grad', `linear-gradient(135deg,${pal.accent},${g2})`);
+    document.body.classList.add('accent-grad');
+  } else {
+    r.removeProperty('--accent-grad');
+    document.body.classList.remove('accent-grad');
+  }
   applyGlass();
 }
 
@@ -650,6 +711,13 @@ let DB = {
     logo:           '',
     glassIntensity: 'off',
     firma:          '',
+    defaultPago:    'efectivo',
+    haptics:        true,
+    dockLabels:     true,
+    accentGrad:     false,
+    compactMode:    false,
+    receiptFooter:  '',
+    showPriceHint:  true,
   },
   productos: ['Salchichas','Chorizo','Jamón','Mortadela','Salami','Tocino','Longaniza','Butifarra'],
   unidades:  {},
@@ -705,7 +773,7 @@ let DE = {
 let vF = {
   cliente: '',
   nota:    '',
-  pago:    'efectivo',
+  pago:    DB.config?.defaultPago || 'efectivo',
   items:   [{ prod:'', cant:1, precio:'', custom:false }]
 };
 
@@ -734,8 +802,14 @@ function cargar() {
     DB.config    = { ...DB.config, ...(p.config||{}) };
     DB.ventas.forEach((v,i) => { if (!v.numRecibo) v.numRecibo = i+1; });
     if (!DB.config.siguienteRec) DB.config.siguienteRec = DB.ventas.length + 1;
-    if (DB.config.darkMode === undefined) DB.config.darkMode = true;
-    if (!DB.config.theme) DB.config.theme = 'blue';
+    if (DB.config.darkMode    === undefined) DB.config.darkMode    = true;
+    if (!DB.config.theme)                    DB.config.theme        = 'blue';
+    if (DB.config.haptics     === undefined) DB.config.haptics      = true;
+    if (DB.config.dockLabels  === undefined) DB.config.dockLabels   = true;
+    if (DB.config.accentGrad  === undefined) DB.config.accentGrad   = false;
+    if (DB.config.compactMode === undefined) DB.config.compactMode  = false;
+    if (DB.config.showPriceHint=== undefined) DB.config.showPriceHint=true;
+    if (!DB.config.defaultPago)              DB.config.defaultPago  = 'efectivo';
   } catch(e) { console.error('Error cargando:', e); }
 }
 
@@ -850,18 +924,33 @@ function mesPasado()  {
 // ═══════════════════════════════════════════════════════════
 const MAS_PAGES = ['clientes','devol','ajustes','inventario','documentos','productos','compras'];
 
-function goTo(p) {
+function goTo(p, pushHistory=true) {
   leerFormVenta();
   if (p !== 'clientes') clienteVisto = null;
   if (p !== 'compras')  { compraVisto = null; compraFechaV = null; }
   paginaActual = p;
+  if (pushHistory) history.pushState({ page:p, sub:null }, '');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   const navId = MAS_PAGES.includes(p) ? 'nav-mas' : ('nav-'+p);
-  document.getElementById(navId)?.classList.add('active');
+  const navBtn = document.getElementById(navId);
+  if (navBtn) {
+    navBtn.classList.add('active');
+    const ico = navBtn.querySelector('.ico');
+    if (ico) { ico.classList.remove('dock-pop'); void ico.offsetWidth; ico.classList.add('dock-pop'); setTimeout(()=>ico.classList.remove('dock-pop'),350); }
+  }
   if (DB.config.glassIntensity !== 'off') {
     const ov = document.getElementById('page-overlay');
     if (ov) { ov.classList.add('flash'); setTimeout(()=>ov.classList.remove('flash'),180); }
   }
+  if (DB.config.haptics !== false) try { navigator.vibrate(6); } catch(e){}
+  render();
+}
+
+function verProveedor(nombre) {
+  compraVisto = nombre;
+  compraMesNav = null;
+  compraFechaV = null;
+  history.pushState({ page:'compras', sub:nombre }, '');
   render();
 }
 
@@ -892,7 +981,7 @@ function verificarDeudaVenta() {
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:.9em">Debe: <b style="color:var(--red)">${fmt(d)}</b></span>
         <button class="btn-sm" style="background:var(--adim);color:var(--accent);border:1px solid rgba(68,147,248,.3)"
-          onclick="clienteVisto='${esc(c)}';goTo('clientes')">Ver perfil →</button>
+          onclick="verCliente('${esc(c)}')">Ver perfil →</button>
       </div>`;
   } else {
     el.style.display = 'none';
@@ -936,7 +1025,8 @@ function htmlFilas() {
       <input type="number" inputmode="decimal" min="0" step="${esPeso?'0.01':'1'}" placeholder="${esc(cantPlaceholder)}"
         value="${esc(String(it.cant))}" style="padding:8px 7px;font-size:.86em${esPeso?';border-color:var(--accent)':''}"
         oninput="vF.items[${i}].cant=+this.value||0;calcTotal()">
-      <input type="number" inputmode="decimal" min="0" placeholder="${esPeso?'$/'+esc(unidad):'Precio'}"
+      <input type="number" inputmode="decimal" min="0"
+        placeholder="${(()=>{const cp=(DB.precios||{})[it.prod];const ph=esPeso?'$/'+esc(unidad):'Precio';return DB.config.showPriceHint!==false&&cp?String(cp):ph;})()}"
         value="${it.precio===''?'':esc(String(it.precio))}" style="padding:8px 7px;font-size:.86em"
         oninput="vF.items[${i}].precio=+this.value||0;calcTotal()">
       ${del}
@@ -1029,7 +1119,7 @@ function renderVenta() {
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:.9em">Debe: <b style="color:var(--red)">${fmt(deudaClienteTotal(vF.cliente.trim()))}</b></span>
           <button class="btn-sm" style="background:var(--adim);color:var(--accent);border:1px solid rgba(68,147,248,.3)"
-            onclick="clienteVisto='${esc(vF.cliente.trim())}';goTo('clientes')">Ver perfil →</button>
+            onclick="verCliente('${esc(vF.cliente.trim())}')">Ver perfil →</button>
         </div>`:''}
     </div>
 
@@ -1072,7 +1162,7 @@ function renderVenta() {
 
 function limpiarForm() {
   if (!confirm('¿Limpiar el formulario?')) return;
-  vF = { cliente:'', nota:'', pago:'efectivo', items:[{prod:'',cant:1,precio:'',custom:false}] };
+  vF = { cliente:'', nota:'', pago:DB.config.defaultPago||'efectivo', items:[{prod:'',cant:1,precio:'',custom:false}] };
   render();
 }
 
@@ -1113,7 +1203,7 @@ function guardarVenta() {
   guardar();
   vibrar();
 
-  vF = { cliente:'', nota:'', pago:'efectivo', items:[{prod:'',cant:1,precio:'',custom:false}] };
+  vF = { cliente:'', nota:'', pago:DB.config.defaultPago||'efectivo', items:[{prod:'',cant:1,precio:'',custom:false}] };
   toast('✅ Venta guardada · ' + fmt(total));
   actualizarHeaderTotal();
   setTimeout(() => mostrarReciboVenta(venta), 400);
@@ -1347,6 +1437,7 @@ function primerFiadoPendiente(nombre) {
 
 function verCliente(nombre) {
   clienteVisto = nombre;
+  history.pushState({ page:'clientes', sub:nombre }, '');
   render();
 }
 
@@ -1389,7 +1480,7 @@ function renderHistorialCliente(nombre) {
   const gruposOrden = Object.entries(grupos).sort((a,b)=>a[0]<b[0]?1:-1);
 
   return `
-    <button class="back-btn" onclick="clienteVisto=null;render()">← Volver a Clientes</button>
+    <button class="back-btn" onclick="history.back()">← Volver a Clientes</button>
 
     <div class="card">
       <div class="card-title">👤 ${esc(nombre)}</div>
@@ -2277,7 +2368,7 @@ function renderAjustes() {
         </div>
       </div>
 
-      <div class="ajuste-row" style="flex-direction:column;align-items:flex-start;gap:8px;border:none;padding-bottom:0">
+      <div class="ajuste-row" style="flex-direction:column;align-items:flex-start;gap:8px">
         <div><div class="ajuste-lbl">Liquid Glass</div><div class="ajuste-sub">Efecto de vidrio translúcido</div></div>
         <div class="pago-pills" style="flex-wrap:wrap">
           ${['off','low','medium','high'].map((v,i)=>{
@@ -2285,6 +2376,70 @@ function renderAjustes() {
             return `<button class="pago-pill${DB.config.glassIntensity===v?' active':''}" onclick="setGlass('${v}')">${lbl}</button>`;
           }).join('')}
         </div>
+      </div>
+
+      <div class="ajuste-row">
+        <div><div class="ajuste-lbl">Acento degradado</div><div class="ajuste-sub">Efecto de color en gradiente</div></div>
+        <label class="toggle">
+          <input type="checkbox" ${DB.config.accentGrad?'checked':''} onchange="DB.config.accentGrad=this.checked;guardar();applyTheme();goTo('ajustes')">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="ajuste-row">
+        <div><div class="ajuste-lbl">Modo compacto</div><div class="ajuste-sub">Reduce el espacio entre tarjetas</div></div>
+        <label class="toggle">
+          <input type="checkbox" ${DB.config.compactMode?'checked':''} onchange="DB.config.compactMode=this.checked;guardar();applyTheme();render()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="ajuste-row" style="border:none">
+        <div><div class="ajuste-lbl">Etiquetas en dock</div><div class="ajuste-sub">Muestra texto bajo los íconos</div></div>
+        <label class="toggle">
+          <input type="checkbox" ${DB.config.dockLabels!==false?'checked':''} onchange="DB.config.dockLabels=this.checked;guardar();applyTheme()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Comportamiento -->
+    <div class="card">
+      <div class="card-title">Comportamiento</div>
+
+      <div class="ajuste-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <div><div class="ajuste-lbl">Método de pago por defecto</div><div class="ajuste-sub">Preseleccionado al iniciar una venta</div></div>
+        <div class="pago-pills" style="flex-wrap:wrap">
+          ${['efectivo','tarjeta','transfer','fiado'].map(v=>`
+            <button class="pago-pill${DB.config.defaultPago===v?' active':''}"
+              onclick="DB.config.defaultPago='${v}';guardar();goTo('ajustes')">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="ajuste-row">
+        <div><div class="ajuste-lbl">Vibración táctil</div><div class="ajuste-sub">Feedback háptico al navegar</div></div>
+        <label class="toggle">
+          <input type="checkbox" ${DB.config.haptics!==false?'checked':''} onchange="DB.config.haptics=this.checked;guardar()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="ajuste-row" style="border:none">
+        <div><div class="ajuste-lbl">Mostrar precio sugerido</div><div class="ajuste-sub">Precio configurado como placeholder en ventas</div></div>
+        <label class="toggle">
+          <input type="checkbox" ${DB.config.showPriceHint!==false?'checked':''} onchange="DB.config.showPriceHint=this.checked;guardar()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Recibo -->
+    <div class="card">
+      <div class="card-title">Recibo</div>
+      <div style="margin-bottom:9px">
+        <label class="input-label">Mensaje en pie de recibo</label>
+        <textarea placeholder="Ej: ¡Gracias por su compra! · WhatsApp: 300 123 4567" rows="2"
+          oninput="DB.config.receiptFooter=this.value;guardar()">${esc(DB.config.receiptFooter||'')}</textarea>
       </div>
     </div>
 
@@ -2506,6 +2661,7 @@ function generarReciboTexto(v) {
     ...(v.nota ? [rep('─',W), 'Nota: '+v.nota.slice(0,W-6)] : []),
     rep('═',W),
     cen('¡Gracias por su compra!'),
+    ...(DB.config.receiptFooter ? [cen(DB.config.receiptFooter.slice(0,W))] : []),
     rep('═',W),
   ];
   return lineas.join('\n');
@@ -2558,6 +2714,7 @@ function generarReciboHTML(v) {
     ...(v.nota ? [rep('─',W), esc('Nota: '+v.nota).slice(0,W)] : []),
     rep('═',W),
     cen('¡Gracias por su compra!'),
+    ...(DB.config.receiptFooter ? [cen(DB.config.receiptFooter.slice(0,W))] : []),
     rep('═',W),
     ...(firma ? ['', rep('_',W), b(cen(firma)), cen('Firma')] : []),
   ];
@@ -2903,7 +3060,7 @@ function renderCompras() {
 
   const provCards = DB.proveedores.map((p, i) => {
     const s = stats[p] || { total:0, count:0, ultima:'' };
-    return `<div class="prov-card" onclick="compraVisto='${esc(p)}';compraMesNav=null;compraFechaV=null;render()">
+    return `<div class="prov-card" onclick="verProveedor('${esc(p)}')"
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:.93em">🏭 ${esc(p)}</div>
         <div style="font-size:.74em;color:var(--muted);margin-top:3px">
@@ -3014,7 +3171,7 @@ function renderDetalleProveedor(nombre) {
   const nextY = m===11 ? y+1 : y, nextM = m===11 ? 0 : m+1;
 
   return `
-    <button class="back-btn" onclick="compraVisto=null;compraFechaV=null;render()">← Volver</button>
+    <button class="back-btn" onclick="history.back()">← Volver</button>
 
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
@@ -3449,6 +3606,32 @@ function render() {
 cargar();
 aplicarFS();
 applyTheme(); // also calls applyGlass()
+vF.pago = DB.config.defaultPago || 'efectivo';
+
+// History-based back navigation (prevents PWA from exiting on back press)
+history.replaceState({ page:'venta', sub:null }, '');
+window.addEventListener('popstate', e => {
+  const s = e.state;
+  if (!s) { history.pushState({ page:paginaActual, sub:null }, ''); return; }
+  // Handle sub-view back (proveedor detail, client detail)
+  if (s.page === 'clientes' && s.sub && !clienteVisto) {
+    clienteVisto = s.sub;
+    render(); return;
+  }
+  if (s.page === 'compras' && s.sub && !compraVisto) {
+    compraVisto = s.sub; compraMesNav = null; compraFechaV = null;
+    render(); return;
+  }
+  // Clear sub-views when going back past them
+  clienteVisto  = s.sub && s.page === 'clientes' ? s.sub : null;
+  compraVisto   = s.sub && s.page === 'compras'  ? s.sub : null;
+  if (!compraVisto) compraFechaV = null;
+  paginaActual = s.page || 'venta';
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  const navId = MAS_PAGES.includes(paginaActual) ? 'nav-mas' : ('nav-' + paginaActual);
+  document.getElementById(navId)?.classList.add('active');
+  render();
+});
 
 const hdrNeg = document.getElementById('hdr-negocio');
 if (hdrNeg) hdrNeg.textContent = DB.config.negocio || 'Mis Ventas';
