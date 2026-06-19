@@ -321,6 +321,7 @@ textarea{resize:none;height:64px;line-height:1.5}
   <button id="nav-hoy" onclick="goTo('hoy')"><span class="ico">📅</span>Hoy</button>
   <button id="nav-ventas" onclick="goTo('ventas')"><span class="ico">📋</span>Ventas</button>
   <button id="nav-clientes" onclick="goTo('clientes')"><span class="ico">👥</span>Clientes</button>
+  <button id="nav-devol" onclick="goTo('devol')"><span class="ico">↩️</span>Devol.</button>
   <button id="nav-informe" onclick="goTo('informe')"><span class="ico">📊</span>Informe</button>
   <button id="nav-ajustes" onclick="goTo('ajustes')"><span class="ico">⚙️</span>Ajustes</button>
 </nav>
@@ -343,8 +344,9 @@ textarea{resize:none;height:64px;line-height:1.5}
       <button class="btn btn-surface" style="font-size:.86em;flex:1" id="btn-fiado-pagar" onclick="marcarFiadoPagado()" style="display:none">✅ Fiado pagado</button>
       <button class="btn btn-red" style="font-size:.86em;flex:1" onclick="pedirEliminar()">🗑️ Eliminar</button>
     </div>
-    <div style="margin-top:10px">
-      <button class="btn btn-surface" style="font-size:.84em" onclick="repetirVenta()">🔁 Repetir esta venta</button>
+    <div style="display:flex;gap:7px;margin-top:7px">
+      <button class="btn btn-surface" style="font-size:.84em;flex:1" onclick="repetirVenta()">🔁 Repetir</button>
+      <button class="btn btn-surface" style="font-size:.84em;flex:1;color:var(--warn)" onclick="abrirDevolucionDesdeDetalle()">↩️ Devolución</button>
     </div>
   </div>
 </div>
@@ -374,6 +376,16 @@ textarea{resize:none;height:64px;line-height:1.5}
     <div class="modal-title">📤 Compartir texto</div>
     <div class="export-area" id="export-text"></div>
     <button class="btn btn-primary" onclick="copiarTexto()">📋 Copiar</button>
+  </div>
+</div>
+
+<!-- Modal: devolución / avería -->
+<div class="modal-bg" id="m-devol" onclick="bgClose(event,'m-devol')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-devol')">✕</button>
+    <div class="modal-title">↩️ Registrar devolución / avería</div>
+    <div id="m-devol-body"></div>
   </div>
 </div>
 
@@ -469,6 +481,10 @@ let exportTxt    = '';
 let reciboTxt    = '';
 let clienteVisto = null;
 let calcExpr     = '';
+let cliPeriodo   = 'mes';   // agrupación del historial por cliente: dia / semana / mes
+let devolVentaId = null;    // venta seleccionada para registrar devolución/avería
+let busquedaDevol= '';
+let devolForm    = { idx:-1, cant:'', motivo:'', tipo:'devolucion' };
 
 let vF = {
   cliente: '',
@@ -510,6 +526,11 @@ function hoy()   { const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth
 function pad(n)  { return String(n).padStart(2,'0'); }
 function isoDate(d) { return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
 function fmt(n)  { return (DB.config.moneda||'$')+(Number(n)||0).toLocaleString('es-CO'); }
+// Cantidad con decimales (para libras/kg): muestra "2" o "2.5" sin ceros sobrantes
+function fmtCant(n) { const x = Number(n)||0; return Number.isInteger(x) ? String(x) : x.toLocaleString('es-CO',{maximumFractionDigits:3}); }
+// Devoluciones / averías descontadas de una factura
+function devTotal(v) { return (v.devoluciones||[]).reduce((s,d)=>s+(+d.monto||0),0); }
+function neto(v)     { return (v.total||0) - devTotal(v); }
 
 function esc(s) {
   return String(s??'')
@@ -612,7 +633,8 @@ function htmlFilas() {
     ).join('');
 
     const unidad = DB.unidades[it.prod] || '';
-    const cantPlaceholder = unidad ? unidad : 'Cant';
+    const esPeso = unidad === 'lb' || unidad === 'kg' || unidad === 'gr';
+    const cantPlaceholder = unidad ? (esPeso ? unidad : 'Cant') : 'Cant';
 
     const campo = it.custom
       ? `<input type="text" placeholder="Nombre producto" value="${esc(it.prod)}"
@@ -630,10 +652,10 @@ function htmlFilas() {
 
     return `<div class="prod-row">
       ${campo}
-      <input type="number" inputmode="numeric" min="0.1" step="0.1" placeholder="${esc(cantPlaceholder)}"
-        value="${esc(String(it.cant))}" style="padding:8px 7px;font-size:.86em"
-        oninput="vF.items[${i}].cant=+this.value||1;calcTotal()">
-      <input type="number" inputmode="decimal" min="0" placeholder="Precio"
+      <input type="number" inputmode="decimal" min="0" step="${esPeso?'0.01':'1'}" placeholder="${esc(cantPlaceholder)}"
+        value="${esc(String(it.cant))}" style="padding:8px 7px;font-size:.86em${esPeso?';border-color:var(--accent)':''}"
+        oninput="vF.items[${i}].cant=+this.value||0;calcTotal()">
+      <input type="number" inputmode="decimal" min="0" placeholder="${esPeso?'$/'+esc(unidad):'Precio'}"
         value="${it.precio===''?'':esc(String(it.precio))}" style="padding:8px 7px;font-size:.86em"
         oninput="vF.items[${i}].precio=+this.value||0;calcTotal()">
       ${del}
@@ -781,10 +803,10 @@ function guardarVenta() {
   const nota    = vF.nota.trim();
 
   const items = vF.items
-    .filter(it => it.prod?.trim() && +it.precio > 0)
-    .map(it => ({ prod:it.prod.trim(), cant:Math.max(0.01,+it.cant||1), precio:Math.round(+it.precio) }));
+    .filter(it => it.prod?.trim() && +it.precio > 0 && +it.cant > 0)
+    .map(it => ({ prod:it.prod.trim(), cant:Math.round((+it.cant)*1000)/1000, precio:Math.round(+it.precio) }));
 
-  if (!items.length) { toast('Agrega al menos un producto con precio mayor a 0', true); return; }
+  if (!items.length) { toast('Agrega producto, cantidad y precio mayor a 0', true); return; }
 
   const total    = items.reduce((s,it)=>s+it.cant*it.precio, 0);
   const numRecibo = DB.config.siguienteRec++;
@@ -809,9 +831,9 @@ function guardarVenta() {
 // ═══════════════════════════════════════════════════════════
 function renderHoy() {
   const ventasHoy = DB.ventas.filter(v => v.fecha === hoy());
-  const total     = ventasHoy.reduce((s,v)=>s+v.total,0);
+  const total     = ventasHoy.reduce((s,v)=>s+neto(v),0);
   const fiados    = ventasHoy.filter(v=>v.pago==='fiado'&&!v.fiadoPagado);
-  const totalFiado= fiados.reduce((s,v)=>s+v.total,0);
+  const totalFiado= fiados.reduce((s,v)=>s+neto(v),0);
   const cliSet    = new Set(ventasHoy.map(v=>v.cliente));
 
   const prods = {};
@@ -824,7 +846,7 @@ function renderHoy() {
     <div class="stats">
       <div class="stat green">
         <div class="stat-val">${fmt(total)}</div>
-        <div class="stat-lbl">Total hoy</div>
+        <div class="stat-lbl">Total neto hoy</div>
       </div>
       <div class="stat accent">
         <div class="stat-val">${ventasHoy.length}</div>
@@ -856,7 +878,7 @@ function renderHoy() {
         const u = DB.unidades[p]||'';
         return `<div class="prod-cat-item">
           <span>${esc(p)}</span>
-          <span class="tag">${c}${u?' '+u:''}</span>
+          <span class="tag">${fmtCant(c)}${u?' '+u:''}</span>
         </div>`;
       }).join('')}
     </div>` : ''}
@@ -884,7 +906,7 @@ function filtrarVentas() {
 
 function renderVentas() {
   const lista   = filtrarVentas();
-  const total   = lista.reduce((s,v)=>s+v.total,0);
+  const total   = lista.reduce((s,v)=>s+neto(v),0);
   const cliOps  = DB.clientes.map(c=>`<option value="${esc(c)}">`).join('');
 
   return `
@@ -933,16 +955,20 @@ function htmlCard(v) {
   const esFiado  = v.pago==='fiado'&&!v.fiadoPagado;
   const cls      = esFiado ? 'venta-item fiado' : v.fiadoPagado ? 'venta-item fiado-pagado' : 'venta-item';
   const pagoLbl  = v.pago==='fiado' ? (v.fiadoPagado?'<span class="badge-green badge">Pagado</span>':'<span class="badge-warn badge">Fiado</span>') : '';
+  const devLbl   = devTotal(v)>0 ? '<span class="badge-warn badge" style="margin-left:4px">↩️ −'+fmt(devTotal(v))+'</span>' : '';
   const prodsStr = v.items.map(it=>{
     const u = DB.unidades[it.prod]||'';
-    return esc(it.prod)+' ×'+it.cant+(u?' '+u:'');
+    return esc(it.prod)+' ×'+fmtCant(it.cant)+(u?' '+u:'');
   }).join(', ');
+  const totalHtml = devTotal(v)>0
+    ? `<span style="text-decoration:line-through;color:var(--muted);font-size:.8em;font-weight:400">${fmt(v.total)}</span> ${fmt(neto(v))}`
+    : fmt(v.total);
   return `<div class="${cls}" onclick="verDetalle('${esc(v.id)}')">
     <div class="venta-top">
       <span class="venta-cliente">👤 ${esc(v.cliente)}</span>
-      <span class="venta-total">${fmt(v.total)}</span>
+      <span class="venta-total">${totalHtml}</span>
     </div>
-    <div class="venta-meta">${fmtFecha(v.fecha)} · ${fmtHora(v.ts)} ${pagoLbl}</div>
+    <div class="venta-meta">${fmtFecha(v.fecha)} · ${fmtHora(v.ts)} ${pagoLbl}${devLbl}</div>
     <div class="venta-prods">${prodsStr}</div>
   </div>`;
 }
@@ -956,10 +982,10 @@ function renderClientes() {
   const stats = {};
   DB.ventas.forEach(v => {
     if (!stats[v.cliente]) stats[v.cliente] = { total:0, count:0, ultima:'', fiado:0 };
-    stats[v.cliente].total += v.total;
+    stats[v.cliente].total += neto(v);
     stats[v.cliente].count++;
     if (v.fecha > stats[v.cliente].ultima) stats[v.cliente].ultima = v.fecha;
-    if (v.pago==='fiado'&&!v.fiadoPagado) stats[v.cliente].fiado += v.total;
+    if (v.pago==='fiado'&&!v.fiadoPagado) stats[v.cliente].fiado += neto(v);
   });
 
   const sorted = Object.entries(stats).sort((a,b)=>b[1].total-a[1].total);
@@ -968,7 +994,7 @@ function renderClientes() {
     return '<div class="empty"><div class="empty-ico">👥</div>Registra ventas para ver el historial de clientes</div>';
   }
 
-  const totalFiadoGlobal = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+v.total,0);
+  const totalFiadoGlobal = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+neto(v),0);
 
   return `
     ${totalFiadoGlobal>0 ? `
@@ -997,16 +1023,41 @@ function verCliente(nombre) {
   render();
 }
 
+// Clave de período para agrupar (dia / semana / mes) + etiqueta legible
+function periodoKey(v, modo) {
+  const d = new Date(v.ts || (v.fecha+'T12:00:00'));
+  if (modo==='dia')    return { key:v.fecha, lbl:fmtFecha(v.fecha) };
+  if (modo==='semana') {
+    const off=(d.getDay()+6)%7;
+    const l=new Date(d); l.setDate(d.getDate()-off);
+    const dom=new Date(l); dom.setDate(l.getDate()+6);
+    return { key:isoDate(l), lbl:'Semana '+fmtFecha(isoDate(l))+' — '+fmtFecha(isoDate(dom)) };
+  }
+  const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return { key:d.getFullYear()+'-'+pad(d.getMonth()+1), lbl:meses[d.getMonth()]+' '+d.getFullYear() };
+}
+
 function renderHistorialCliente(nombre) {
   const ventas = DB.ventas.filter(v=>v.cliente===nombre).sort((a,b)=>b.ts-a.ts);
-  const total  = ventas.reduce((s,v)=>s+v.total,0);
-  const fiado  = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+v.total,0);
+  const total  = ventas.reduce((s,v)=>s+neto(v),0);
+  const fiado  = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+neto(v),0);
+  const devol  = ventas.reduce((s,v)=>s+devTotal(v),0);
 
   const prodsTotal = {};
   ventas.forEach(v=>v.items.forEach(it=>{
     prodsTotal[it.prod]=(prodsTotal[it.prod]||0)+it.cant;
   }));
   const topProds = Object.entries(prodsTotal).sort((a,b)=>b[1]-a[1]).slice(0,4);
+
+  // Agrupar por período seleccionado
+  const grupos = {};
+  ventas.forEach(v => {
+    const { key, lbl } = periodoKey(v, cliPeriodo);
+    if (!grupos[key]) grupos[key] = { lbl, ventas:[], total:0 };
+    grupos[key].ventas.push(v);
+    grupos[key].total += neto(v);
+  });
+  const gruposOrden = Object.entries(grupos).sort((a,b)=>a[0]<b[0]?1:-1);
 
   return `
     <button class="back-btn" onclick="clienteVisto=null;render()">← Volver a Clientes</button>
@@ -1018,6 +1069,7 @@ function renderHistorialCliente(nombre) {
         <div class="stat accent"><div class="stat-val">${ventas.length}</div><div class="stat-lbl">Compras</div></div>
       </div>
       ${fiado>0 ? `<div style="margin-top:9px;padding:8px;background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);border-radius:8px;font-size:.82em;color:var(--warn)">📋 Fiado pendiente: <b>${fmt(fiado)}</b></div>` : ''}
+      ${devol>0 ? `<div style="margin-top:7px;padding:8px;background:var(--rdim);border:1px solid rgba(248,81,73,.3);border-radius:8px;font-size:.82em;color:var(--red)">↩️ Devoluciones/averías: <b>${fmt(devol)}</b></div>` : ''}
     </div>
 
     ${topProds.length ? `
@@ -1025,12 +1077,24 @@ function renderHistorialCliente(nombre) {
       <div class="card-title">Lo que más compra</div>
       ${topProds.map(([p,c])=>{
         const u=DB.unidades[p]||'';
-        return `<div class="prod-cat-item"><span>${esc(p)}</span><span class="tag">${c}${u?' '+u:''}</span></div>`;
+        return `<div class="prod-cat-item"><span>${esc(p)}</span><span class="tag">${fmtCant(c)}${u?' '+u:''}</span></div>`;
       }).join('')}
     </div>` : ''}
 
-    <div class="section-title">Historial de compras</div>
-    ${ventas.map(v=>htmlCard(v)).join('')}
+    <div class="section-title">Registro de compras</div>
+    <div class="compare-tabs">
+      ${[['dia','Por día'],['semana','Por semana'],['mes','Por mes']].map(([k,l])=>`
+        <button class="compare-tab${cliPeriodo===k?' active':''}" onclick="cliPeriodo='${k}';render()">${l}</button>`).join('')}
+    </div>
+
+    ${gruposOrden.map(([,g])=>`
+      <div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;padding:0 2px">
+          <span style="font-size:.84em;font-weight:700">${esc(g.lbl)}</span>
+          <span style="font-size:.84em;font-weight:700;color:var(--green)">${fmt(g.total)} · ${g.ventas.length}</span>
+        </div>
+        ${g.ventas.map(v=>htmlCard(v)).join('')}
+      </div>`).join('')}
   `;
 }
 
@@ -1067,17 +1131,40 @@ function verDetalle(id) {
     row.className = 'resumen-prod';
     const u = DB.unidades[it.prod]||'';
     const l = document.createElement('span');
-    l.textContent = it.prod + ' ×' + it.cant + (u?' '+u:'');
+    l.textContent = it.prod + ' ×' + fmtCant(it.cant) + (u?' '+u:'');
     const r = document.createElement('span');
     r.textContent = fmt(it.cant * it.precio);
     row.appendChild(l); row.appendChild(r);
     body.appendChild(row);
   });
 
+  // Subtotal (solo si hay devoluciones)
+  if (devTotal(v) > 0) {
+    const subtot = document.createElement('div');
+    subtot.className = 'resumen-prod';
+    const sl = document.createElement('span'); sl.textContent = 'Subtotal';
+    const sv = document.createElement('span'); sv.textContent = fmt(v.total);
+    subtot.appendChild(sl); subtot.appendChild(sv);
+    body.appendChild(subtot);
+  }
+
+  // Devoluciones / averías registradas
+  (v.devoluciones||[]).forEach(d => {
+    const row = document.createElement('div');
+    row.className = 'resumen-prod';
+    row.style.color = 'var(--red)';
+    const l = document.createElement('span');
+    l.textContent = (d.tipo==='averia'?'⚠️ Avería: ':'↩️ Devol.: ') + d.prod + (d.motivo?' ('+d.motivo+')':'');
+    const r = document.createElement('span');
+    r.textContent = '−' + fmt(d.monto);
+    row.appendChild(l); row.appendChild(r);
+    body.appendChild(row);
+  });
+
   const tr = document.createElement('div');
   tr.className = 'resumen-total';
-  const tl = document.createElement('span'); tl.textContent = 'Total';
-  const tv = document.createElement('span'); tv.style.color='var(--green)'; tv.textContent=fmt(v.total);
+  const tl = document.createElement('span'); tl.textContent = devTotal(v)>0 ? 'Total neto' : 'Total';
+  const tv = document.createElement('span'); tv.style.color='var(--green)'; tv.textContent=fmt(neto(v));
   tr.appendChild(tl); tr.appendChild(tv);
   body.appendChild(tr);
 
@@ -1151,17 +1238,211 @@ function compartirVenta() {
 function exportarLista() {
   const lista = filtrarVentas();
   if (!lista.length) { toast('No hay ventas para exportar',true); return; }
-  const total = lista.reduce((s,v)=>s+v.total,0);
+  const total = lista.reduce((s,v)=>s+neto(v),0);
   const txt = [
     '📋 REGISTRO DE VENTAS — ' + DB.config.negocio,
     '═'.repeat(36),
-    ...lista.map(v=>`${fmtFecha(v.fecha)} ${fmtHora(v.ts)}\n  👤 ${v.cliente} · ${fmt(v.total)} · ${v.pago||'efectivo'}\n  ${v.items.map(it=>it.prod+'×'+it.cant).join(', ')}`),
+    ...lista.map(v=>`${fmtFecha(v.fecha)} ${fmtHora(v.ts)}\n  👤 ${v.cliente} · ${fmt(neto(v))} · ${v.pago||'efectivo'}\n  ${v.items.map(it=>it.prod+'×'+fmtCant(it.cant)).join(', ')}`),
     '═'.repeat(36),
     `💰 TOTAL: ${fmt(total)}   |   ${lista.length} ventas`
   ].join('\n');
   if (navigator.share) {
     navigator.share({ text:txt, title:'Registro de ventas' }).catch(()=>mostrarExport(txt));
   } else { mostrarExport(txt); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// DEVOLUCIONES / AVERÍAS
+// ═══════════════════════════════════════════════════════════
+function renderDevol() {
+  // Todas las devoluciones/averías registradas (con su venta)
+  const registros = [];
+  DB.ventas.forEach(v => (v.devoluciones||[]).forEach(d =>
+    registros.push({ ...d, venta:v })));
+  registros.sort((a,b)=>(b.ts||0)-(a.ts||0));
+
+  const totalDevol = registros.filter(r=>r.tipo!=='averia').reduce((s,r)=>s+r.monto,0);
+  const totalAveria= registros.filter(r=>r.tipo==='averia').reduce((s,r)=>s+r.monto,0);
+
+  // Búsqueda de facturas (por cliente o # recibo)
+  const q = busquedaDevol.trim().toLowerCase();
+  let encontradas = [];
+  if (q) {
+    encontradas = DB.ventas.filter(v =>
+      v.cliente.toLowerCase().includes(q) ||
+      String(v.numRecibo||'').includes(q) ||
+      String(v.numRecibo||'').padStart(4,'0').includes(q)
+    ).slice(0,15);
+  }
+
+  return `
+    <div class="card" style="background:var(--rdim);border-color:rgba(248,81,73,.25)">
+      <div class="card-title">↩️ Buscar factura para devolver / avería</div>
+      <div style="font-size:.78em;color:var(--muted);margin-bottom:8px">
+        Escribe el nombre del cliente o el número de recibo. Luego elige el producto y se descuenta de la factura automáticamente.
+      </div>
+      <input type="search" id="devol-busq" placeholder="🔍 Cliente o # recibo..."
+        value="${esc(busquedaDevol)}" oninput="busquedaDevol=this.value;refrescarDevolBusq()">
+    </div>
+
+    <div id="devol-resultados">${htmlDevolResultados(encontradas, q)}</div>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-val" style="color:var(--red)">${fmt(totalDevol)}</div><div class="stat-lbl">Total devoluciones</div></div>
+      <div class="stat"><div class="stat-val" style="color:var(--warn)">${fmt(totalAveria)}</div><div class="stat-lbl">Total averías</div></div>
+    </div>
+
+    <div class="section-title">Historial de devoluciones ${registros.length?`<span class="badge">${registros.length}</span>`:''}</div>
+    ${registros.length ? registros.map(r=>`
+      <div class="venta-item" style="border-left-color:${r.tipo==='averia'?'var(--warn)':'var(--red)'};cursor:pointer"
+        onclick="verDetalle('${esc(r.venta.id)}')">
+        <div class="venta-top">
+          <span class="venta-cliente">${r.tipo==='averia'?'⚠️':'↩️'} ${esc(r.prod)}</span>
+          <span class="venta-total" style="color:var(--red)">−${fmt(r.monto)}</span>
+        </div>
+        <div class="venta-meta">${fmtFecha(r.fecha)} · ${esc(r.venta.cliente)} · Rec #${String(r.venta.numRecibo||0).padStart(4,'0')}</div>
+        ${r.motivo?`<div class="venta-prods">${esc(r.motivo)}</div>`:''}
+      </div>`).join('')
+      : '<div class="empty"><div class="empty-ico">↩️</div>Sin devoluciones registradas<br>Busca una factura arriba para registrar una</div>'}
+  `;
+}
+
+function htmlDevolResultados(lista, q) {
+  if (!q) return '';
+  if (!lista.length) return '<div class="empty" style="padding:20px"><div class="empty-ico">🔍</div>No se encontró ninguna factura</div>';
+  return '<div class="section-title">Resultados</div>' + lista.map(v=>`
+    <div class="venta-item" onclick="abrirDevolucion('${esc(v.id)}')">
+      <div class="venta-top">
+        <span class="venta-cliente">👤 ${esc(v.cliente)}</span>
+        <span class="venta-total">${fmt(neto(v))}</span>
+      </div>
+      <div class="venta-meta">${fmtFecha(v.fecha)} · Rec #${String(v.numRecibo||0).padStart(4,'0')} ${devTotal(v)>0?'<span class="badge-warn badge">Ya tiene devol.</span>':''}</div>
+      <div class="venta-prods">Toca para registrar devolución / avería</div>
+    </div>`).join('');
+}
+
+function refrescarDevolBusq() {
+  busquedaDevol = document.getElementById('devol-busq')?.value||'';
+  const q = busquedaDevol.trim().toLowerCase();
+  let enc = [];
+  if (q) enc = DB.ventas.filter(v =>
+    v.cliente.toLowerCase().includes(q) ||
+    String(v.numRecibo||'').includes(q) ||
+    String(v.numRecibo||'').padStart(4,'0').includes(q)
+  ).slice(0,15);
+  const el = document.getElementById('devol-resultados');
+  if (el) el.innerHTML = htmlDevolResultados(enc, q);
+}
+
+function abrirDevolucionDesdeDetalle() {
+  if (!ventaSelId) return;
+  closeModal('m-detalle');
+  abrirDevolucion(ventaSelId);
+}
+
+function abrirDevolucion(ventaId) {
+  const v = DB.ventas.find(x=>x.id===ventaId);
+  if (!v) { toast('Factura no encontrada',true); return; }
+  devolVentaId = ventaId;
+  devolForm = { idx: v.items.length===1?0:-1, cant:'', motivo:'', tipo:'devolucion' };
+  pintarDevolForm();
+  openModal('m-devol');
+}
+
+function pintarDevolForm() {
+  const v = DB.ventas.find(x=>x.id===devolVentaId);
+  if (!v) return;
+  const body = document.getElementById('m-devol-body');
+  if (!body) return;
+
+  const it   = devolForm.idx>=0 ? v.items[devolForm.idx] : null;
+  const u    = it ? (DB.unidades[it.prod]||'') : '';
+  const maxC = it ? it.cant : 0;
+  const cantNum = +devolForm.cant || 0;
+  const monto = it ? Math.round(Math.min(cantNum, maxC) * it.precio) : 0;
+
+  body.innerHTML = `
+    <div style="font-size:.82em;color:var(--muted);margin-bottom:10px">
+      Factura de <b style="color:var(--text)">${esc(v.cliente)}</b> · Rec #${String(v.numRecibo||0).padStart(4,'0')} · ${fmtFecha(v.fecha)}
+    </div>
+
+    <label class="input-label">Producto a devolver</label>
+    <select onchange="devolForm.idx=+this.value;devolForm.cant='';pintarDevolForm()" style="margin-bottom:10px">
+      <option value="-1"${devolForm.idx===-1?' selected':''}>— Elige el producto —</option>
+      ${v.items.map((x,i)=>{
+        const xu=DB.unidades[x.prod]||'';
+        return `<option value="${i}"${devolForm.idx===i?' selected':''}>${esc(x.prod)} (×${fmtCant(x.cant)}${xu?' '+xu:''} · ${fmt(x.precio)} c/u)</option>`;
+      }).join('')}
+    </select>
+
+    ${it ? `
+      <label class="input-label">Cantidad devuelta / dañada (máx ${fmtCant(maxC)}${u?' '+u:''})</label>
+      <input type="number" inputmode="decimal" min="0" step="${u==='lb'||u==='kg'||u==='gr'?'0.01':'1'}" max="${maxC}"
+        placeholder="Ej: ${u==='lb'?'5':'1'}" value="${esc(String(devolForm.cant))}"
+        oninput="devolForm.cant=this.value;actualizarMontoDevol()" style="margin-bottom:10px">
+
+      <label class="input-label">Tipo</label>
+      <div class="pago-pills" style="margin-bottom:10px">
+        <button class="pago-pill${devolForm.tipo==='devolucion'?' active':''}" onclick="devolForm.tipo='devolucion';pintarDevolForm()">↩️ Devolución</button>
+        <button class="pago-pill fiado${devolForm.tipo==='averia'?' active':''}" onclick="devolForm.tipo='averia';pintarDevolForm()">⚠️ Avería</button>
+      </div>
+
+      <label class="input-label">Motivo (opcional)</label>
+      <input type="text" placeholder="Ej: producto vencido, mal estado..." value="${esc(devolForm.motivo)}"
+        oninput="devolForm.motivo=this.value" style="margin-bottom:12px">
+
+      <div class="total-bar" style="margin-bottom:12px">
+        <div><div class="total-bar-sub">Se descontará de la factura</div></div>
+        <div class="total-bar-val" id="devol-monto" style="color:var(--red)">−${fmt(monto)}</div>
+      </div>
+
+      <button class="btn btn-green" onclick="guardarDevolucion()">✅ Registrar y descontar</button>
+    ` : ''}
+  `;
+}
+
+function actualizarMontoDevol() {
+  const v = DB.ventas.find(x=>x.id===devolVentaId);
+  if (!v) return;
+  const it = v.items[devolForm.idx];
+  if (!it) return;
+  const cant = Math.min(+devolForm.cant||0, it.cant);
+  const el = document.getElementById('devol-monto');
+  if (el) el.textContent = '−' + fmt(Math.round(cant * it.precio));
+}
+
+function guardarDevolucion() {
+  const v = DB.ventas.find(x=>x.id===devolVentaId);
+  if (!v) return;
+  const it = v.items[devolForm.idx];
+  if (!it) { toast('Elige un producto',true); return; }
+  const cant = Math.min(+devolForm.cant||0, it.cant);
+  if (cant <= 0) { toast('Indica una cantidad válida',true); return; }
+
+  const monto = Math.round(cant * it.precio);
+  if (!v.devoluciones) v.devoluciones = [];
+  v.devoluciones.push({
+    id: uid(), prod: it.prod, cant, monto,
+    motivo: devolForm.motivo.trim(),
+    tipo: devolForm.tipo,
+    fecha: hoy(), ts: Date.now()
+  });
+  guardar();
+  vibrar();
+  closeModal('m-devol');
+  toast((devolForm.tipo==='averia'?'⚠️ Avería':'↩️ Devolución')+' registrada · −'+fmt(monto));
+  actualizarHeaderTotal();
+  render();
+}
+
+function quitarDevolucion(ventaId, devolId) {
+  const v = DB.ventas.find(x=>x.id===ventaId);
+  if (!v || !v.devoluciones) return;
+  if (!confirm('¿Eliminar esta devolución/avería? El monto volverá a la factura.')) return;
+  v.devoluciones = v.devoluciones.filter(d=>d.id!==devolId);
+  guardar();
+  toast('Devolución eliminada');
+  render();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1172,7 +1453,7 @@ function ultimos7dias() {
   for (let i=6; i>=0; i--) {
     const d = new Date(); d.setDate(d.getDate()-i);
     const iso   = isoDate(d);
-    const total = DB.ventas.filter(v=>v.fecha===iso).reduce((s,v)=>s+v.total,0);
+    const total = DB.ventas.filter(v=>v.fecha===iso).reduce((s,v)=>s+neto(v),0);
     const isToday = i===0;
     const lbl   = d.toLocaleDateString('es',{weekday:'short'}).slice(0,2);
     dias.push({ iso, total, lbl, isToday });
@@ -1199,7 +1480,7 @@ function renderDonut(prods) {
     <div class="donut-leg-item">
       <div class="donut-dot" style="background:${COLORS[i]||'#888'}"></div>
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p)}</span>
-      <span style="color:var(--muted);flex-shrink:0"> ×${c}</span>
+      <span style="color:var(--muted);flex-shrink:0"> ×${fmtCant(c)}</span>
     </div>`).join('');
 
   return `
@@ -1230,10 +1511,10 @@ function ventasRango(desde,hasta) {
   return DB.ventas.filter(v=>v.fecha>=desde&&v.fecha<=hasta);
 }
 function calcStats(ventas) {
-  const total  = ventas.reduce((s,v)=>s+v.total,0);
+  const total  = ventas.reduce((s,v)=>s+neto(v),0);
   const clis   = [...new Set(ventas.map(v=>v.cliente))];
   const prods  = {};
-  const fiados = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+v.total,0);
+  const fiados = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+neto(v),0);
   ventas.forEach(v=>v.items.forEach(it=>{ prods[it.prod]=(prods[it.prod]||0)+it.cant; }));
   return { total, count:ventas.length, clis, prods, fiados };
 }
@@ -1268,23 +1549,23 @@ function renderInforme() {
       <div class="bar-row">
         <div class="bar-lbl" style="color:var(--accent)">${esc(lbl1)}</div>
         <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(c1/maxP*100)}%"></div></div>
-        <div class="bar-val">×${c1}</div>
+        <div class="bar-val">×${fmtCant(c1)}</div>
       </div>
       <div class="bar-row">
         <div class="bar-lbl" style="color:var(--muted)">${esc(lbl2)}</div>
         <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(c2/maxP*100)}%;background:var(--sfc2);border:1px solid var(--border)"></div></div>
-        <div class="bar-val">×${c2}</div>
+        <div class="bar-val">×${fmtCant(c2)}</div>
       </div>
     </div>`;
   }).join('');
 
   // Top clientes período 1
   const cliStats = {};
-  v1.forEach(v=>{ cliStats[v.cliente]=(cliStats[v.cliente]||0)+v.total; });
+  v1.forEach(v=>{ cliStats[v.cliente]=(cliStats[v.cliente]||0)+neto(v); });
   const topCli = Object.entries(cliStats).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const maxCli = Math.max(1,...topCli.map(([,t])=>t));
 
-  const fiadoTotal = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+v.total,0);
+  const fiadoTotal = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+neto(v),0);
 
   const fPers = compareMode==='custom' ? `
     <div class="card">
@@ -1394,9 +1675,9 @@ function exportarInforme() {
     '═'.repeat(36),
     '💰 Total: '+fmt(e.total), '🧾 Ventas: '+e.count, '👥 Clientes: '+e.clis.length, '',
     'PRODUCTOS:',
-    ...Object.entries(e.prods).sort((a,b)=>b[1]-a[1]).map(([p,c])=>`  • ${p}: ×${c}`),
+    ...Object.entries(e.prods).sort((a,b)=>b[1]-a[1]).map(([p,c])=>`  • ${p}: ×${fmtCant(c)}`),
     '', 'DETALLE:',
-    ...v.map(vn=>`  ${fmtFecha(vn.fecha)} ${fmtHora(vn.ts)} | ${vn.cliente} | ${fmt(vn.total)} | ${vn.pago||''}`)
+    ...v.map(vn=>`  ${fmtFecha(vn.fecha)} ${fmtHora(vn.ts)} | ${vn.cliente} | ${fmt(neto(vn))} | ${vn.pago||''}`)
   ].join('\n');
   if (navigator.share) {
     navigator.share({ text:txt, title:'Informe '+lbl }).catch(()=>mostrarExport(txt));
@@ -1429,7 +1710,7 @@ function renderAjustes() {
   const palColores = { blue:'#4493f8', green:'#3fb950', purple:'#a371f7', orange:'#f0883e', red:'#e05252' };
 
   const fiadosPend  = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado);
-  const totalFiado  = fiadosPend.reduce((s,v)=>s+v.total,0);
+  const totalFiado  = fiadosPend.reduce((s,v)=>s+neto(v),0);
 
   return `
     <!-- Logo y negocio -->
@@ -1504,7 +1785,7 @@ function renderAjustes() {
         ${fiadosPend.slice(0,5).map(v=>`
           <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:.86em">
             <span>👤 ${esc(v.cliente)} <span style="color:var(--muted);font-size:.83em">${fmtFecha(v.fecha)}</span></span>
-            <span style="color:var(--warn);font-weight:700">${fmt(v.total)}</span>
+            <span style="color:var(--warn);font-weight:700">${fmt(neto(v))}</span>
           </div>`).join('')}
       </div>
     </div>` : ''}
@@ -1687,11 +1968,18 @@ function generarReciboTexto(v) {
     rep('─',W),
     ...v.items.map(it => {
       const u     = DB.unidades[it.prod]||'';
-      const label = (it.prod+' x'+it.cant+(u?' '+u:'')).slice(0,W-10);
+      const label = (it.prod+' x'+fmtCant(it.cant)+(u?' '+u:'')).slice(0,W-10);
       return fila(label, fmt(it.cant*it.precio));
     }),
     rep('─',W),
-    fila('TOTAL:', fmt(v.total)),
+    ...(devTotal(v)>0 ? [
+      fila('Subtotal:', fmt(v.total)),
+      ...(v.devoluciones||[]).map(d =>
+        fila((d.tipo==='averia'?'Averia ':'Devol ')+d.prod.slice(0,W-14), '-'+fmt(d.monto))),
+      fila('TOTAL:', fmt(neto(v))),
+    ] : [
+      fila('TOTAL:', fmt(v.total)),
+    ]),
     fila('Pago:', pagoLabel[v.pago]||v.pago||''),
     ...(v.nota ? [rep('─',W), 'Nota: '+v.nota.slice(0,W-6)] : []),
     rep('═',W),
@@ -1798,7 +2086,7 @@ function calcPress(val) {
 // ═══════════════════════════════════════════════════════════
 function actualizarHeaderTotal() {
   const ventasHoy = DB.ventas.filter(v=>v.fecha===hoy());
-  const total = ventasHoy.reduce((s,v)=>s+v.total,0);
+  const total = ventasHoy.reduce((s,v)=>s+neto(v),0);
   const el = document.getElementById('hdr-total-hoy');
   if (el) el.textContent = ventasHoy.length ? fmt(total) : '';
 }
@@ -1819,6 +2107,7 @@ function render() {
   else if (paginaActual==='hoy')      app.innerHTML = renderHoy();
   else if (paginaActual==='ventas')   app.innerHTML = renderVentas();
   else if (paginaActual==='clientes') app.innerHTML = renderClientes();
+  else if (paginaActual==='devol')    app.innerHTML = renderDevol();
   else if (paginaActual==='informe')  app.innerHTML = renderInforme();
   else if (paginaActual==='ajustes')  app.innerHTML = renderAjustes();
   actualizarHeaderTotal();

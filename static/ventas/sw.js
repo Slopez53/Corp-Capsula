@@ -1,4 +1,4 @@
-const CACHE = 'embutidos-v1';
+const CACHE = 'embutidos-v2';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
