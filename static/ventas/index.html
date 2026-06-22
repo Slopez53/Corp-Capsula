@@ -165,6 +165,20 @@ textarea{resize:none;height:64px;line-height:1.5}
 .prod-row{display:grid;grid-template-columns:1fr 68px 82px 34px;
   gap:5px;align-items:center;margin-bottom:7px;}
 .prod-row input,.prod-row select{padding:8px 7px;font-size:.86em}
+/* PRICE TIER PILLS (venta form) */
+.price-pills{display:flex;gap:5px;margin:-3px 0 6px;flex-wrap:wrap}
+.price-pill{background:var(--adim);border:1px solid rgba(68,147,248,.35);
+  color:var(--accent);border-radius:20px;padding:3px 10px;font-size:.74em;
+  cursor:pointer;font-family:inherit;font-weight:600;transition:background .15s,transform .1s}
+.price-pill:active{transform:scale(.94)}
+.price-pill.green{background:rgba(63,185,80,.1);border-color:rgba(63,185,80,.35);color:var(--green)}
+/* COMPRA PRODUCT CARD */
+.compra-item-card{background:var(--sfc2);border:1px solid var(--border);border-radius:14px;
+  padding:11px 11px 9px;margin-bottom:9px}
+.compra-price-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
+.compra-price-lbl{font-size:.7em;color:var(--muted);margin-bottom:3px;font-weight:600}
+.compra-price-lbl.accent{color:var(--accent)}
+.compra-price-lbl.green{color:var(--green)}
 .del-btn{border:none;background:var(--rdim);color:var(--red);border-radius:12px;
   font-size:.88em;cursor:pointer;height:36px;width:34px;
   display:flex;align-items:center;justify-content:center;
@@ -728,8 +742,10 @@ let DB = {
     showPriceHint:  true,
   },
   productos: ['Salchichas','Chorizo','Jamón','Mortadela','Salami','Tocino','Longaniza','Butifarra'],
-  unidades:  {},
-  precios:   {},
+  unidades:      {},
+  precios:       {},
+  preciosPie:    {},
+  preciosCompra: {},
   clientes:   [],
   entradas:   [],
   documentos: [],
@@ -761,7 +777,7 @@ let cobroItems   = [];      // índices de items a marcar como pagados
 let compraVisto  = null;   // proveedor name being viewed
 let compraMesNav = null;   // {y, m} for calendar nav
 let compraFechaV = null;   // specific date selected in calendar
-let compraItems  = [{ prod:'', cant:'', costo:'' }];
+let compraItems  = [{ prod:'', cant:'', costoUnit:'', precioVenta:'', precioPie:'' }];
 let compraPendingImg = '';
 
 // ── Doc Editor ───────────────────────────────────────────────
@@ -801,8 +817,10 @@ function cargar() {
     DB.ventas    = Array.isArray(p.ventas)    ? p.ventas    : [];
     DB.clientes  = Array.isArray(p.clientes)  ? p.clientes  : [];
     DB.productos = Array.isArray(p.productos) && p.productos.length ? p.productos : DB.productos;
-    DB.unidades  = (p.unidades  && typeof p.unidades==='object')  ? p.unidades  : {};
-    DB.precios   = (p.precios   && typeof p.precios==='object')   ? p.precios   : {};
+    DB.unidades      = (p.unidades      && typeof p.unidades==='object')      ? p.unidades      : {};
+    DB.precios       = (p.precios       && typeof p.precios==='object')       ? p.precios       : {};
+    DB.preciosPie    = (p.preciosPie    && typeof p.preciosPie==='object')    ? p.preciosPie    : {};
+    DB.preciosCompra = (p.preciosCompra && typeof p.preciosCompra==='object') ? p.preciosCompra : {};
     DB.entradas   = Array.isArray(p.entradas)    ? p.entradas    : [];
     DB.documentos = Array.isArray(p.documentos)  ? p.documentos  : [];
     DB.proveedores= Array.isArray(p.proveedores) ? p.proveedores : [];
@@ -1038,16 +1056,28 @@ function htmlFilas() {
       ? `<button class="del-btn" onclick="quitarFila(${i})">✕</button>`
       : `<div style="width:34px"></div>`;
 
-    return `<div class="prod-row">
-      ${campo}
-      <input type="number" inputmode="decimal" min="0" step="${esPeso?'0.01':'1'}" placeholder="${esc(cantPlaceholder)}"
-        value="${esc(String(it.cant))}" style="padding:8px 7px;font-size:.86em${esPeso?';border-color:var(--accent)':''}"
-        oninput="vF.items[${i}].cant=+this.value||0;calcTotal()">
-      <input type="number" inputmode="decimal" min="0"
-        placeholder="${(()=>{const cp=(DB.precios||{})[it.prod];const ph=esPeso?'$/'+esc(unidad):'Precio';return DB.config.showPriceHint!==false&&cp?String(cp):ph;})()}"
-        value="${it.precio===''?'':esc(String(it.precio))}" style="padding:8px 7px;font-size:.86em"
-        oninput="vF.items[${i}].precio=+this.value||0;calcTotal()">
-      ${del}
+    const pv = it.prod && !it.custom ? (DB.precios||{})[it.prod] : null;
+    const pp = it.prod && !it.custom ? (DB.preciosPie||{})[it.prod] : null;
+    const priceHint = DB.config.showPriceHint !== false && pv ? String(pv) : (esPeso ? '$/'+esc(unidad) : 'Precio');
+    const pricePills = it.prod && !it.custom && (pv || pp) ? `
+      <div class="price-pills">
+        ${pv ? `<button class="price-pill" onclick="vF.items[${i}].precio=${pv};refrescarFilas();calcTotal()">💼 Mayoreo ${fmt(pv)}</button>` : ''}
+        ${pp ? `<button class="price-pill green" onclick="vF.items[${i}].precio=${pp};refrescarFilas();calcTotal()">🧍 Detal ${fmt(pp)}</button>` : ''}
+      </div>` : '';
+
+    return `<div>
+      <div class="prod-row">
+        ${campo}
+        <input type="number" inputmode="decimal" min="0" step="${esPeso?'0.01':'1'}" placeholder="${esc(cantPlaceholder)}"
+          value="${esc(String(it.cant))}" style="padding:8px 7px;font-size:.86em${esPeso?';border-color:var(--accent)':''}"
+          oninput="vF.items[${i}].cant=+this.value||0;calcTotal()">
+        <input type="number" inputmode="decimal" min="0"
+          placeholder="${priceHint}"
+          value="${it.precio===''?'':esc(String(it.precio))}" style="padding:8px 7px;font-size:.86em"
+          oninput="vF.items[${i}].precio=+this.value||0;calcTotal()">
+        ${del}
+      </div>
+      ${pricePills}
     </div>`;
   }).join('');
 }
@@ -2303,6 +2333,22 @@ function setPrecio(idx, val) {
   if (v > 0) DB.precios[p] = v; else delete DB.precios[p];
   guardar();
 }
+function setPrecioPie(idx, val) {
+  const p = DB.productos[idx];
+  if (!p) return;
+  if (!DB.preciosPie) DB.preciosPie = {};
+  const v = parseFloat(val);
+  if (v > 0) DB.preciosPie[p] = v; else delete DB.preciosPie[p];
+  guardar();
+}
+function setPrecioCompra(idx, val) {
+  const p = DB.productos[idx];
+  if (!p) return;
+  if (!DB.preciosCompra) DB.preciosCompra = {};
+  const v = parseFloat(val);
+  if (v > 0) DB.preciosCompra[p] = v; else delete DB.preciosCompra[p];
+  guardar();
+}
 
 // ═══════════════════════════════════════════════════════════
 // AJUSTES
@@ -3016,17 +3062,38 @@ function borrarDoc(id) {
 // ═══════════════════════════════════════════════════════════
 function renderProductos() {
   const prodList = DB.productos.map((p, i) => `
-    <div class="prod-page-item">
-      <span style="flex:1;min-width:90px;font-weight:600">${esc(p)}${DB.unidades[p]?` <span class="unit-tag">${esc(DB.unidades[p])}</span>`:''}</span>
-      <input type="number" min="0" inputmode="decimal" placeholder="Precio/${esc(DB.unidades[p]||'unid')}"
-        value="${(DB.precios||{})[p]||''}"
-        style="width:90px;padding:5px 8px;font-size:.82em;text-align:right"
-        oninput="setPrecio(${i},this.value)">
-      <select class="unit-select" data-prod="${esc(p)}" onchange="setUnidadEvt(this)" style="width:68px">
-        <option value="">unid.</option>
-        ${['lb','kg','gr','paq','unid'].map(u=>`<option value="${u}"${DB.unidades[p]===u?' selected':''}>${u}</option>`).join('')}
-      </select>
-      <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="quitarProd(${i})">✕</button>
+    <div class="prod-page-item" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="flex:1;font-weight:600">${esc(p)}</span>
+        <select class="unit-select" data-prod="${esc(p)}" onchange="setUnidadEvt(this)" style="width:68px">
+          <option value="">unid.</option>
+          ${['lb','kg','gr','paq','unid'].map(u=>`<option value="${u}"${DB.unidades[p]===u?' selected':''}>${u}</option>`).join('')}
+        </select>
+        <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="quitarProd(${i})">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <div>
+          <div class="compra-price-lbl">💸 Costo</div>
+          <input type="number" min="0" inputmode="decimal" placeholder="0"
+            value="${(DB.preciosCompra||{})[p]||''}"
+            style="padding:5px 8px;font-size:.82em;width:100%;text-align:right"
+            oninput="setPrecioCompra(${i},this.value)">
+        </div>
+        <div>
+          <div class="compra-price-lbl accent">🏷️ P. Venta</div>
+          <input type="number" min="0" inputmode="decimal" placeholder="0"
+            value="${(DB.precios||{})[p]||''}"
+            style="padding:5px 8px;font-size:.82em;width:100%;text-align:right;border-color:var(--accent)"
+            oninput="setPrecio(${i},this.value)">
+        </div>
+        <div>
+          <div class="compra-price-lbl green">🧍 P. Detal</div>
+          <input type="number" min="0" inputmode="decimal" placeholder="0"
+            value="${(DB.preciosPie||{})[p]||''}"
+            style="padding:5px 8px;font-size:.82em;width:100%;text-align:right;border-color:var(--green)"
+            oninput="setPrecioPie(${i},this.value)">
+        </div>
+      </div>
     </div>`).join('');
 
   return `
@@ -3034,8 +3101,8 @@ function renderProductos() {
 
     <div class="card" style="background:var(--adim);border-color:rgba(68,147,248,.25);margin-bottom:11px">
       <div style="font-size:.82em;color:var(--text);line-height:1.55">
-        💡 Asigna la <b>unidad</b> (lb, kg…) y el <b>precio de venta</b> de cada producto.<br>
-        El precio se auto-completa al crear una venta. Si usas libras, el sistema calcula el valor automáticamente.
+        💡 Asigna la <b>unidad</b>, el <b>precio de venta</b> (mayoreo) y el <b>precio detal</b> de cada producto.<br>
+        En la venta aparecen pills para elegir el tier. En compras se actualizan automáticamente.
       </div>
     </div>
 
@@ -3226,7 +3293,7 @@ function renderDetalleProveedor(nombre) {
 }
 
 function abrirCompra(proveedor) {
-  compraItems = [{ prod:'', cant:'', costo:'' }];
+  compraItems = [{ prod:'', cant:'', costoUnit:'', precioVenta:'', precioPie:'' }];
   compraPendingImg = '';
   pintarCompraForm(proveedor);
   openModal('m-compra');
@@ -3234,27 +3301,53 @@ function abrirCompra(proveedor) {
 
 function pintarCompraForm(proveedor) {
   const el = document.getElementById('m-compra-body'); if (!el) return;
-  const filas = compraItems.map((it, i) => `
-    <div class="prod-row">
-      <select style="padding:8px 7px;font-size:.86em" onchange="compraItems[${i}].prod=this.value">
-        <option value="">— Producto —</option>
-        ${DB.productos.map(p=>`<option value="${esc(p)}"${it.prod===p?' selected':''}>${esc(p)}</option>`).join('')}
-      </select>
-      <input type="number" inputmode="decimal" min="0" step="0.01" placeholder="Cant"
-        value="${esc(String(it.cant))}" style="padding:8px 7px;font-size:.86em"
-        oninput="compraItems[${i}].cant=this.value">
-      <input type="number" inputmode="decimal" min="0" placeholder="Costo"
-        value="${esc(String(it.costo))}" style="padding:8px 7px;font-size:.86em"
-        oninput="compraItems[${i}].costo=this.value">
-      ${compraItems.length>1 ? `<button class="del-btn" onclick="compraItems.splice(${i},1);pintarCompraForm('${esc(proveedor)}')">✕</button>` : '<div style="width:34px"></div>'}
-    </div>`).join('');
+  const filas = compraItems.map((it, i) => {
+    const cu = it.costoUnit !== '' ? it.costoUnit : ((DB.preciosCompra||{})[it.prod] || '');
+    const pv = it.precioVenta !== '' ? it.precioVenta : ((DB.precios||{})[it.prod] || '');
+    const pp = it.precioPie  !== '' ? it.precioPie  : ((DB.preciosPie||{})[it.prod] || '');
+    const subtotal = (+it.costoUnit||0) * (+it.cant||0);
+    return `
+    <div class="compra-item-card">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:0">
+        <select style="flex:1;padding:8px 7px;font-size:.86em" onchange="compraItems[${i}].prod=this.value;compraItems[${i}].costoUnit='';compraItems[${i}].precioVenta='';compraItems[${i}].precioPie='';pintarCompraForm('${esc(proveedor)}')">
+          <option value="">— Producto —</option>
+          ${DB.productos.map(p=>`<option value="${esc(p)}"${it.prod===p?' selected':''}>${esc(p)}</option>`).join('')}
+        </select>
+        <input type="number" inputmode="decimal" min="0" step="0.01" placeholder="Cant"
+          value="${esc(String(it.cant))}" style="width:70px;padding:8px 7px;font-size:.86em"
+          oninput="compraItems[${i}].cant=this.value;actualizarTotalCompra()">
+        ${compraItems.length>1 ? `<button class="del-btn" onclick="compraItems.splice(${i},1);pintarCompraForm('${esc(proveedor)}')">✕</button>` : '<div style="width:34px"></div>'}
+      </div>
+      <div class="compra-price-grid">
+        <div>
+          <div class="compra-price-lbl">💸 Costo unit.</div>
+          <input type="number" inputmode="decimal" min="0" placeholder="0"
+            value="${esc(String(cu))}" style="padding:6px 7px;font-size:.82em;width:100%"
+            oninput="compraItems[${i}].costoUnit=this.value;actualizarTotalCompra()">
+        </div>
+        <div>
+          <div class="compra-price-lbl accent">🏷️ P. Venta</div>
+          <input type="number" inputmode="decimal" min="0" placeholder="0"
+            value="${esc(String(pv))}" style="padding:6px 7px;font-size:.82em;width:100%;border-color:var(--accent)"
+            oninput="compraItems[${i}].precioVenta=this.value">
+        </div>
+        <div>
+          <div class="compra-price-lbl green">🧍 P. Detal</div>
+          <input type="number" inputmode="decimal" min="0" placeholder="0"
+            value="${esc(String(pp))}" style="padding:6px 7px;font-size:.82em;width:100%;border-color:var(--green)"
+            oninput="compraItems[${i}].precioPie=this.value">
+        </div>
+      </div>
+      ${subtotal>0?`<div style="text-align:right;font-size:.75em;color:var(--muted);margin-top:5px">Subtotal: <b>${fmt(subtotal)}</b></div>`:''}
+    </div>`;
+  }).join('');
 
-  const totalCompra = compraItems.reduce((s,it)=>s+(+it.costo||0),0);
+  const totalCompra = compraItems.reduce((s,it)=>s+(+it.costoUnit||0)*(+it.cant||0),0);
   el.innerHTML = `
     <div style="font-size:.84em;font-weight:700;color:var(--accent);margin-bottom:12px">🏭 ${esc(proveedor)}</div>
     <div class="card-title" style="margin-bottom:7px">Productos comprados</div>
     <div id="compra-filas">${filas}</div>
-    <button class="btn btn-surface" style="margin-top:7px;font-size:.86em" onclick="compraItems.push({prod:'',cant:'',costo:''});pintarCompraForm('${esc(proveedor)}')">＋ Agregar producto</button>
+    <button class="btn btn-surface" style="margin-top:7px;font-size:.86em" onclick="compraItems.push({prod:'',cant:'',costoUnit:'',precioVenta:'',precioPie:''});pintarCompraForm('${esc(proveedor)}')">＋ Agregar producto</button>
 
     ${compraPendingImg ? `
     <div style="margin-top:12px">
@@ -3277,10 +3370,17 @@ function pintarCompraForm(proveedor) {
 
     <div class="total-bar" style="margin-top:12px;margin-bottom:10px">
       <div><div style="font-size:.76em;color:var(--muted)">Total esta compra</div></div>
-      <div class="total-bar-val">${fmt(totalCompra)}</div>
+      <div class="total-bar-val" id="compra-total-val">${fmt(totalCompra)}</div>
     </div>
     <button class="btn btn-green" onclick="guardarCompra('${esc(proveedor)}')">✅ Registrar compra</button>
   `;
+}
+
+function actualizarTotalCompra() {
+  const el = document.getElementById('compra-total-val');
+  if (!el) return;
+  const total = compraItems.reduce((s,it)=>s+(+it.costoUnit||0)*(+it.cant||0),0);
+  el.textContent = fmt(total);
 }
 
 function procesarFotoCompra(event, proveedor) {
@@ -3303,14 +3403,30 @@ function procesarFotoCompra(event, proveedor) {
 function guardarCompra(proveedor) {
   const items = compraItems
     .filter(it => it.prod?.trim() && +it.cant > 0)
-    .map(it => ({ prod:it.prod.trim(), cant:Math.round(+it.cant*1000)/1000, costo:+it.costo||0 }));
+    .map(it => ({
+      prod:        it.prod.trim(),
+      cant:        Math.round(+it.cant*1000)/1000,
+      costoUnit:   +it.costoUnit||0,
+      costo:       Math.round((+it.costoUnit||0) * (+it.cant||0)),
+      precioVenta: +it.precioVenta||0,
+      precioPie:   +it.precioPie||0,
+    }));
   if (!items.length) { toast('Agrega al menos un producto con cantidad', true); return; }
+  // Actualizar precios en catálogo para cada producto
+  if (!DB.precios)       DB.precios       = {};
+  if (!DB.preciosPie)    DB.preciosPie    = {};
+  if (!DB.preciosCompra) DB.preciosCompra = {};
+  items.forEach(it => {
+    if (it.costoUnit   > 0) DB.preciosCompra[it.prod] = it.costoUnit;
+    if (it.precioVenta > 0) DB.precios[it.prod]       = it.precioVenta;
+    if (it.precioPie   > 0) DB.preciosPie[it.prod]    = it.precioPie;
+  });
   const nota = document.getElementById('compra-nota')?.value.trim() || '';
   if (!DB.compras) DB.compras = [];
   DB.compras.unshift({ id:uid(), fecha:hoy(), ts:Date.now(), proveedor, items, facturaImg:compraPendingImg||'', nota });
   guardar(); vibrar();
   closeModal('m-compra');
-  toast('✅ Compra registrada');
+  toast('✅ Compra registrada — precios actualizados');
   render();
 }
 
@@ -3318,11 +3434,26 @@ function verCompra(id) {
   const c = (DB.compras||[]).find(x=>x.id===id); if (!c) return;
   const body = document.getElementById('m-compra-det-body'); if (!body) return;
   const total = (c.items||[]).reduce((s,it)=>s+(+it.costo||0),0);
+  const itemsHtml = (c.items||[]).map(it => {
+    const u = DB.unidades[it.prod]||'';
+    const hasPrices = it.precioVenta > 0 || it.precioPie > 0;
+    return `<div class="resumen-prod" style="flex-direction:column;align-items:stretch;gap:3px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span><b>${esc(it.prod)}</b> ×${fmtCant(it.cant)}${u?' '+esc(u):''}</span>
+        <span style="color:var(--green)">${fmt(it.costo)}</span>
+      </div>
+      ${hasPrices ? `<div style="display:flex;gap:8px;font-size:.75em;color:var(--muted)">
+        ${it.costoUnit>0 ? `<span>💸 Costo: <b>${fmt(it.costoUnit)}</b></span>` : ''}
+        ${it.precioVenta>0 ? `<span style="color:var(--accent)">🏷️ Venta: <b>${fmt(it.precioVenta)}</b></span>` : ''}
+        ${it.precioPie>0  ? `<span style="color:var(--green)">🧍 Detal: <b>${fmt(it.precioPie)}</b></span>` : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
   body.innerHTML = `
     <div style="font-size:.84em;font-weight:700;color:var(--accent);margin-bottom:4px">🏭 ${esc(c.proveedor)}</div>
     <div style="font-size:.76em;color:var(--muted);margin-bottom:11px">${fmtFecha(c.fecha)} · ${fmtHora(c.ts)}</div>
-    ${(c.items||[]).map(it=>{const u=DB.unidades[it.prod]||'';return `<div class="resumen-prod"><span>${esc(it.prod)} ×${fmtCant(it.cant)}${u?' '+esc(u):''}</span><span style="color:var(--green)">${fmt(it.costo)}</span></div>`;}).join('')}
-    <div class="resumen-total"><span>Total</span><span style="color:var(--green)">${fmt(total)}</span></div>
+    ${itemsHtml}
+    <div class="resumen-total"><span>Total compra</span><span style="color:var(--green)">${fmt(total)}</span></div>
     ${c.nota?`<div style="margin-top:9px;font-size:.82em;color:var(--muted);padding:7px;background:var(--sfc2);border-radius:7px">📝 ${esc(c.nota)}</div>`:''}
     ${c.facturaImg?`
     <div style="margin-top:13px">
