@@ -642,7 +642,23 @@ body.offline .offline-badge{display:inline}
     <input type="tel" id="cli-tel-inp" placeholder="Ej: 3001234567" inputmode="tel" style="margin-bottom:10px">
     <label class="input-label">Notas / Dirección</label>
     <input type="text" id="cli-nota-inp" placeholder="Dirección, referencia, detalles..." style="margin-bottom:16px">
-    <button class="btn-prim" onclick="guardarInfoCliente()">Guardar</button>
+    <button class="btn btn-primary" onclick="guardarInfoCliente()">Guardar</button>
+  </div>
+</div>
+
+<!-- Modal: nuevo cliente -->
+<div class="modal-bg" id="m-nuevo-cli" onclick="bgClose(event,'m-nuevo-cli')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-nuevo-cli')">✕</button>
+    <div class="modal-title">👤 Nuevo cliente</div>
+    <label class="input-label">Nombre *</label>
+    <input type="text" id="nc-nombre" placeholder="Nombre del cliente" autocomplete="off" style="margin-bottom:10px">
+    <label class="input-label">Teléfono</label>
+    <input type="tel" id="nc-tel" placeholder="Ej: 3001234567" inputmode="tel" style="margin-bottom:10px">
+    <label class="input-label">Notas / Dirección</label>
+    <input type="text" id="nc-nota" placeholder="Dirección, referencia..." style="margin-bottom:16px">
+    <button class="btn btn-primary" onclick="guardarNuevoCliente()">✅ Agregar cliente</button>
   </div>
 </div>
 
@@ -662,7 +678,7 @@ body.offline .offline-badge{display:inline}
       <option value="servicios">Servicios</option>
       <option value="otro">Otro</option>
     </select>
-    <button class="btn-prim" onclick="guardarGasto()">Guardar Gasto</button>
+    <button class="btn btn-primary" onclick="guardarGasto()">Guardar Gasto</button>
   </div>
 </div>
 
@@ -1647,12 +1663,20 @@ function renderClientes() {
 
   const stats = {};
   DB.ventas.forEach(v => {
+    if (!v.cliente) return;
     if (!stats[v.cliente]) stats[v.cliente] = { total:0, count:0, ultima:'', fiado:0 };
     stats[v.cliente].total += neto(v);
     stats[v.cliente].count++;
     if (v.fecha > stats[v.cliente].ultima) stats[v.cliente].ultima = v.fecha;
     stats[v.cliente].fiado += montoPendienteV(v);
   });
+  // Include DB.clientes entries that have no sales yet
+  (DB.clientes||[]).forEach(c => {
+    const n = clienteNombre(c);
+    if (n && !stats[n]) stats[n] = { total:0, count:0, ultima:'', fiado:0 };
+  });
+
+  const addBtn = `<button class="btn btn-surface" style="width:100%;margin-bottom:10px;font-size:.88em" onclick="openModal('m-nuevo-cli');setTimeout(()=>document.getElementById('nc-nombre')?.focus(),150)">＋ Nuevo cliente</button>`;
 
   // Debtors first, then by total
   const sorted = Object.entries(stats).sort((a,b) => {
@@ -1661,7 +1685,7 @@ function renderClientes() {
   });
 
   if (!sorted.length) {
-    return '<div class="empty"><div class="empty-ico">👥</div>Registra ventas para ver el historial de clientes</div>';
+    return `${addBtn}<div class="empty"><div class="empty-ico">👥</div>Aún no hay clientes<br><span style="font-size:.84em">Toca el botón de arriba para agregar uno</span></div>`;
   }
 
   const totalFiadoGlobal = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado)
@@ -1669,6 +1693,7 @@ function renderClientes() {
   const clientesConDeuda = sorted.filter(([,s])=>s.fiado>0).length;
 
   return `
+    ${addBtn}
     ${totalFiadoGlobal>0 ? `
     <div style="background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.35);border-radius:var(--radius);
       padding:12px 13px;margin-bottom:11px;display:flex;justify-content:space-between;align-items:center">
@@ -1679,21 +1704,22 @@ function renderClientes() {
       <div style="font-size:1.1em;font-weight:700;color:var(--red)">${fmt(totalFiadoGlobal)}</div>
     </div>` : ''}
 
-    <div class="section-title">${sorted.length} clientes</div>
+    <div class="section-title">${sorted.length} cliente${sorted.length!==1?'s':''}</div>
     ${sorted.map(([nombre, s]) => {
       const riesgo = perfilRiesgo(nombre);
+      const sinCompras = s.count === 0;
       return `
       <div class="cli-card" onclick="verCliente('${esc(nombre)}')">
         <div class="cli-card-top">
           <div style="display:flex;align-items:center;gap:7px">
             <div class="cli-card-name">👤 ${esc(nombre)}</div>
             ${s.fiado>0 ? `<span class="badge badge-red" style="font-size:.66em">${riesgo.label}</span>` :
-              riesgo.label==='Al día'&&s.total>0 ? '' : ''}
+              sinCompras ? `<span class="badge" style="font-size:.66em;background:var(--sfc2);color:var(--muted)">Nuevo</span>` : ''}
           </div>
-          <div class="cli-card-total">${fmt(s.total)}</div>
+          <div class="cli-card-total">${sinCompras ? '' : fmt(s.total)}</div>
         </div>
         <div class="cli-card-meta" style="display:flex;justify-content:space-between;align-items:center">
-          <span>${s.count} compra${s.count!==1?'s':''} · Última: ${fmtFecha(s.ultima)}
+          <span>${sinCompras ? 'Sin compras registradas' : s.count+' compra'+(s.count!==1?'s':'')+' · Última: '+fmtFecha(s.ultima)}
           ${s.fiado>0 ? `<span class="badge-warn badge" style="margin-left:6px">Debe ${fmt(s.fiado)}</span>`:''}
           </span>
           ${s.fiado>0 ? `<button class="btn-sm" style="background:var(--gdim);color:var(--green);border:1px solid rgba(63,185,80,.3);margin-left:8px;flex-shrink:0"
@@ -1729,6 +1755,20 @@ function guardarInfoCliente() {
   guardar(); vibrar();
   closeModal('m-cli-info');
   toast('✅ Info guardada');
+  if (paginaActual === 'clientes') render();
+}
+
+function guardarNuevoCliente() {
+  const nombre = document.getElementById('nc-nombre').value.trim();
+  if (!nombre) { toast('El nombre es obligatorio', true); return; }
+  if (getClienteObj(nombre)) { toast('Ya existe un cliente con ese nombre', true); return; }
+  const tel  = document.getElementById('nc-tel').value.trim();
+  const nota = document.getElementById('nc-nota').value.trim();
+  if (!DB.clientes) DB.clientes = [];
+  DB.clientes.push({ id: uid(), nombre, tel, ubicacion: null, notas: nota });
+  guardar(); vibrar();
+  closeModal('m-nuevo-cli');
+  toast('✅ Cliente ' + nombre + ' agregado');
   if (paginaActual === 'clientes') render();
 }
 
@@ -1951,11 +1991,14 @@ function renderHistorialCliente(nombre) {
             <span style="font-weight:700;color:var(--red)">${fmt(pend)}</span>
           </div>
           ${v.items.map((it,i)=>{
-            const paid=(v.itemsPagados||[]).includes(i);
+            const cantPag = (v.cantsPagadas||{})[i] || (((v.itemsPagados||[]).includes(i)) ? it.cant : 0);
+            const paid = cantPag >= it.cant;
+            const partial = cantPag > 0 && cantPag < it.cant;
+            const u = DB.unidades[it.prod]||'';
             return `<div style="display:flex;justify-content:space-between;font-size:.8em;padding:2px 0;
               color:${paid?'var(--muted)':'var(--text)'}">
-              <span>${paid?'<s>':''}${esc(it.prod)} ×${fmtCant(it.cant)}${DB.unidades[it.prod]?' '+esc(DB.unidades[it.prod]):''}${paid?'</s> ✓':''}</span>
-              <span style="color:${paid?'var(--muted)':'var(--warn)'}">${paid?'<s>':''}${fmt(it.cant*it.precio)}${paid?'</s>':''}</span>
+              <span>${paid?'<s>':''}${esc(it.prod)} ×${fmtCant(it.cant)}${u?' '+esc(u):''}${paid?'</s> ✓':partial?` <span style="color:var(--warn)">(${fmtCant(cantPag)} abonado)</span>`:''}</span>
+              <span style="color:${paid?'var(--muted)':partial?'var(--warn)':'var(--red)'}">${paid?'<s>':''}${fmt(it.cant*it.precio)}${paid?'</s>':''}</span>
             </div>`;
           }).join('')}
           ${pagado>0&&pend>0 ? `<div style="font-size:.76em;color:var(--muted);margin-top:4px">Abonado: ${fmt(pagado)}</div>` : ''}
@@ -3674,20 +3717,33 @@ function pintarEntradaForm() {
       <div>
         <label class="input-label">Cantidad${u?' ('+esc(u)+')':''}</label>
         <input type="number" inputmode="decimal" min="0" step="0.001" id="inp-ent-cant"
-          placeholder="0" value="${esc(String(entradaForm.cant))}" oninput="entradaForm.cant=this.value;pintarEntradaForm()">
+          placeholder="0" value="${esc(String(entradaForm.cant))}" oninput="entradaForm.cant=this.value;_actualizarTotalEntrada()">
       </div>
       <div>
         <label class="input-label">Costo unitario</label>
         <input type="number" inputmode="decimal" min="0" id="inp-ent-costo"
-          placeholder="0" value="${esc(String(entradaForm.costoUnit))}" oninput="entradaForm.costoUnit=this.value;pintarEntradaForm()">
+          placeholder="0" value="${esc(String(entradaForm.costoUnit))}" oninput="entradaForm.costoUnit=this.value;_actualizarTotalEntrada()">
       </div>
     </div>
-    ${cant>0&&cunit>0?`<div style="text-align:right;font-size:.82em;color:var(--accent);margin-bottom:9px;font-weight:700">
-      Total entrada: ${fmt(cant*cunit)}</div>`:''}
+    <div id="ent-total-row" style="${cant>0&&cunit>0?'':'display:none'}text-align:right;font-size:.82em;color:var(--accent);margin-bottom:9px;font-weight:700">
+      Total entrada: ${fmt(cant*cunit)}</div>
     <label class="input-label">Nota (opcional)</label>
     <input type="text" placeholder="Proveedor, lote, vencimiento..." value="${esc(entradaForm.nota)}"
       style="margin-bottom:12px" oninput="entradaForm.nota=this.value">
     <button class="btn btn-green" onclick="guardarEntrada()">✅ Registrar entrada</button>`;
+}
+
+function _actualizarTotalEntrada() {
+  const cant  = +entradaForm.cant   || 0;
+  const cunit = +entradaForm.costoUnit || 0;
+  const el    = document.getElementById('ent-total-row');
+  if (!el) return;
+  if (cant > 0 && cunit > 0) {
+    el.style.display = '';
+    el.textContent   = 'Total entrada: ' + fmt(cant * cunit);
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 function guardarEntrada() {
@@ -4709,7 +4765,7 @@ function insightsHoy(ventasHoy) {
     : '';
   // hour heatmap (peak hour)
   const byHour = {};
-  ventasHoy.forEach(v => { const h = new Date(v.fecha).getHours(); byHour[h]=(byHour[h]||0)+1; });
+  ventasHoy.forEach(v => { const h = new Date(v.ts || v.fecha+'T12:00:00').getHours(); byHour[h]=(byHour[h]||0)+1; });
   const peakH = Object.entries(byHour).sort((a,b)=>b[1]-a[1])[0];
   const peakTxt = peakH ? `Hora pico: <b>${peakH[0]}:00</b>` : '';
   return `<div class="card" style="margin-bottom:12px;border-left:3px solid var(--accent)">
@@ -4732,7 +4788,6 @@ function resumenSemanaIA(v1, v2, lbl1, lbl2) {
       : `<span style="color:var(--red)">▼ ${Math.abs(delta)}% vs ${esc(lbl2)}</span>`)
     : '';
   // top product in period 1
-  const freq = _freqProd(0); // unused — compute from v1 directly
   const fq1 = {};
   v1.forEach(v=>(v.items||[]).forEach(it=>{ if(it.prod) fq1[it.prod]=(fq1[it.prod]||0)+(+it.cant||1); }));
   const top1 = Object.entries(fq1).sort((a,b)=>b[1]-a[1])[0];
