@@ -415,6 +415,36 @@ body.accent-grad .stat.accent{background:linear-gradient(135deg,rgba(68,147,248,
 .back-btn:active{opacity:.6}
 /* SECTION TITLE decoration */
 .section-title::before{content:'';width:3px;height:13px;border-radius:2px;background:var(--accent);display:inline-block}
+/* LOCK SCREEN */
+#lock-screen{position:fixed;inset:0;z-index:9999;background:var(--bg);display:none;flex-direction:column;
+  align-items:center;justify-content:center;padding:24px}
+.lock-card{width:100%;max-width:320px;text-align:center}
+.lock-icon{font-size:2.8em;margin-bottom:8px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.3))}
+.lock-title{font-size:1.1em;font-weight:700;color:var(--text);margin-bottom:4px}
+.lock-sub{font-size:.8em;color:var(--muted);margin-bottom:22px}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:22px}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);transition:background .15s,border-color .15s}
+.pin-dot.fill{background:var(--accent);border-color:var(--accent)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.pin-btn{height:60px;border:1px solid var(--border);border-radius:16px;background:var(--sfc);
+  color:var(--text);font-size:1.3em;font-weight:600;cursor:pointer;transition:background .12s,transform .1s;
+  font-family:inherit;-webkit-tap-highlight-color:transparent}
+.pin-btn:active{background:var(--sfc2);transform:scale(.93)}
+.pin-btn-del{font-size:1.1em;background:var(--rdim);color:var(--red);border-color:rgba(248,81,73,.2)}
+/* GLOBAL SEARCH */
+.srch-result{padding:10px 12px;border-radius:12px;background:var(--sfc2);margin-bottom:7px;cursor:pointer;
+  border:1px solid var(--border);transition:background .13s}
+.srch-result:active{background:var(--sfc)}
+.srch-tipo{font-size:.7em;color:var(--accent);font-weight:700;margin-bottom:2px}
+/* HEADER search/lock buttons */
+.hdr-actions{display:flex;gap:6px;align-items:center}
+.hdr-icon-btn{background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;
+  padding:4px 6px;border-radius:8px;transition:background .15s;-webkit-tap-highlight-color:transparent}
+.hdr-icon-btn:active{background:var(--sfc2)}
+/* OFFLINE BADGE */
+.offline-badge{font-size:.62em;background:var(--warn);color:#000;border-radius:6px;
+  padding:1px 5px;font-weight:700;display:none}
+body.offline .offline-badge{display:inline}
 </style>
 </head>
 <body>
@@ -428,6 +458,11 @@ body.accent-grad .stat.accent{background:linear-gradient(135deg,rgba(68,147,248,
     </div>
   </div>
   <div class="hdr-meta">
+    <span class="offline-badge" id="offline-badge">SIN RED</span>
+    <div class="hdr-actions">
+      <button class="hdr-icon-btn" onclick="abrirBusqueda()" title="Buscar (Ctrl+K)">🔍</button>
+      <button class="hdr-icon-btn" id="btn-lock" onclick="bloquearApp()" title="Bloquear" style="display:none">🔒</button>
+    </div>
     <div class="hdr-total" id="hdr-total-hoy"></div>
     <div class="hdr-lbl">hoy</div>
   </div>
@@ -535,13 +570,49 @@ body.accent-grad .stat.accent{background:linear-gradient(135deg,rgba(68,147,248,
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('ajustes')">
         <span class="mas-ico">⚙️</span><span class="mas-lbl">Ajustes</span>
       </button>
-      <button class="mas-btn" onclick="closeModal('m-mas');exportarJSON()">
-        <span class="mas-ico">📥</span><span class="mas-lbl">Backup</span>
-      </button>
-      <button class="mas-btn" onclick="closeModal('m-mas');abrirCalc()">
-        <span class="mas-ico">🧮</span><span class="mas-lbl">Calc</span>
-      </button>
     </div>
+  </div>
+</div>
+
+<!-- LOCK SCREEN -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title" id="lock-negocio">Mis Ventas</div>
+    <div class="lock-sub">Ingresa tu PIN para continuar</div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-btn" onclick="pinDigito('1')">1</button>
+      <button class="pin-btn" onclick="pinDigito('2')">2</button>
+      <button class="pin-btn" onclick="pinDigito('3')">3</button>
+      <button class="pin-btn" onclick="pinDigito('4')">4</button>
+      <button class="pin-btn" onclick="pinDigito('5')">5</button>
+      <button class="pin-btn" onclick="pinDigito('6')">6</button>
+      <button class="pin-btn" onclick="pinDigito('7')">7</button>
+      <button class="pin-btn" onclick="pinDigito('8')">8</button>
+      <button class="pin-btn" onclick="pinDigito('9')">9</button>
+      <div></div>
+      <button class="pin-btn" onclick="pinDigito('0')">0</button>
+      <button class="pin-btn pin-btn-del" onclick="pinBorrar()">⌫</button>
+    </div>
+    <div id="pin-error" style="font-size:.8em;color:var(--red);min-height:18px;text-align:center"></div>
+  </div>
+</div>
+
+<!-- Modal: búsqueda global -->
+<div class="modal-bg" id="m-busqueda" onclick="bgClose(event,'m-busqueda')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-busqueda')">✕</button>
+    <div class="modal-title">🔍 Búsqueda</div>
+    <input type="search" id="busq-inp" placeholder="Ventas, clientes, productos, proveedores..."
+      oninput="busquedaGlobal(this.value)" autocomplete="off" style="margin-bottom:0">
+    <div id="busq-resultados" style="margin-top:11px;max-height:55vh;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -740,6 +811,10 @@ let DB = {
     compactMode:    false,
     receiptFooter:  '',
     showPriceHint:  true,
+    pinEnabled:     false,
+    pinHash:        '',
+    pinSalt:        '',
+    autoLockMin:    5,
   },
   productos: ['Salchichas','Chorizo','Jamón','Mortadela','Salami','Tocino','Longaniza','Butifarra'],
   unidades:      {},
@@ -836,6 +911,10 @@ function cargar() {
     if (DB.config.compactMode === undefined) DB.config.compactMode  = false;
     if (DB.config.showPriceHint=== undefined) DB.config.showPriceHint=true;
     if (!DB.config.defaultPago)              DB.config.defaultPago  = 'efectivo';
+    if (DB.config.pinEnabled   === undefined) DB.config.pinEnabled   = false;
+    if (!DB.config.pinHash)                  DB.config.pinHash       = '';
+    if (!DB.config.pinSalt)                  DB.config.pinSalt       = '';
+    if (!DB.config.autoLockMin)              DB.config.autoLockMin   = 5;
   } catch(e) { console.error('Error cargando:', e); }
 }
 
@@ -914,9 +993,16 @@ function bgClose(e,id)  { if (e.target===e.currentTarget) closeModal(id); }
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const open = document.querySelector('.modal-bg.open:not(#m-doc-editor)');
-    if (open) open.classList.remove('open');
+    if (open) { open.classList.remove('open'); return; }
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+    if (e.key === 'k') { e.preventDefault(); abrirBusqueda(); return; }
+    if (e.key === 'n') { e.preventDefault(); goTo('venta'); return; }
   }
 });
+
+window.addEventListener('online',  () => document.body.classList.remove('offline'));
+window.addEventListener('offline', () => document.body.classList.add('offline'));
 function vibrar()       { if (DB.config.haptics !== false) try { navigator.vibrate?.(40); } catch(e){} }
 
 // ═══════════════════════════════════════════════════════════
@@ -1003,25 +1089,29 @@ function leerFormVenta() {
   if (nt) vF.nota    = nt.value;
 }
 
+let _deudaTimer = null;
 function verificarDeudaVenta() {
   const inp = document.getElementById('input-cliente');
   if (!inp) return;
   vF.cliente = inp.value;
-  const c = inp.value.trim();
-  const d = c ? deudaClienteTotal(c) : 0;
-  const el = document.getElementById('deuda-aviso-venta');
-  if (!el) return;
-  if (d > 0) {
-    el.style.display = 'block';
-    el.innerHTML = `<div style="font-size:.83em;font-weight:700;color:var(--red);margin-bottom:5px">⚠️ <b>${esc(c)}</b> tiene deuda pendiente</div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:.9em">Debe: <b style="color:var(--red)">${fmt(d)}</b></span>
-        <button class="btn-sm" style="background:var(--adim);color:var(--accent);border:1px solid rgba(68,147,248,.3)"
-          onclick="verCliente('${esc(c)}')">Ver perfil →</button>
-      </div>`;
-  } else {
-    el.style.display = 'none';
-  }
+  clearTimeout(_deudaTimer);
+  _deudaTimer = setTimeout(() => {
+    const c = vF.cliente.trim();
+    const d = c ? deudaClienteTotal(c) : 0;
+    const el = document.getElementById('deuda-aviso-venta');
+    if (!el) return;
+    if (d > 0) {
+      el.style.display = 'block';
+      el.innerHTML = `<div style="font-size:.83em;font-weight:700;color:var(--red);margin-bottom:5px">⚠️ <b>${esc(c)}</b> tiene deuda pendiente</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.9em">Debe: <b style="color:var(--red)">${fmt(d)}</b></span>
+          <button class="btn-sm" style="background:var(--adim);color:var(--accent);border:1px solid rgba(68,147,248,.3)"
+            onclick="verCliente('${esc(c)}')">Ver perfil →</button>
+        </div>`;
+    } else {
+      el.style.display = 'none';
+    }
+  }, 120);
 }
 
 function ultimoPrecio(prod) {
@@ -2550,24 +2640,58 @@ function renderAjustes() {
       </div>
     </div>
 
+    <!-- Seguridad -->
+    <div class="card">
+      <div class="card-title">🔒 Seguridad y privacidad</div>
+
+      <div class="ajuste-row" style="flex-direction:column;align-items:flex-start;gap:8px;border:none">
+        <div>
+          <div class="ajuste-lbl">PIN de acceso</div>
+          <div class="ajuste-sub">${DB.config.pinEnabled ? '🔒 Activo — la app se bloquea automáticamente' : 'Desactivado — cualquiera con el dispositivo puede acceder'}</div>
+        </div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <button class="btn-sm" style="background:var(--adim);color:var(--accent);border:1px solid rgba(68,147,248,.3)"
+            onclick="pedirNuevoPin()">${DB.config.pinEnabled ? '🔑 Cambiar PIN' : '🔒 Activar PIN'}</button>
+          ${DB.config.pinEnabled ? `<button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="quitarPin()">Desactivar</button>` : ''}
+        </div>
+      </div>
+
+      ${DB.config.pinEnabled ? `
+      <div class="ajuste-row" style="border-top:1px solid var(--border);padding-top:12px;flex-direction:column;align-items:flex-start;gap:8px">
+        <div><div class="ajuste-lbl">Bloqueo automático</div><div class="ajuste-sub">Minutos de inactividad antes de bloquear</div></div>
+        <div class="pago-pills" style="flex-wrap:wrap">
+          ${[1,5,10,30].map(m=>`<button class="pago-pill${DB.config.autoLockMin===m?' active':''}" onclick="DB.config.autoLockMin=${m};guardar();goTo('ajustes')">${m} min</button>`).join('')}
+        </div>
+      </div>` : ''}
+    </div>
+
     <!-- Datos -->
     <div class="card">
-      <div class="card-title">Datos</div>
+      <div class="card-title">Datos y backup</div>
       <div class="ajuste-row">
-        <div><div class="ajuste-lbl">Registros guardados</div><div class="ajuste-sub">${DB.ventas.length} ventas en localStorage</div></div>
+        <div><div class="ajuste-lbl">Registros guardados</div><div class="ajuste-sub">${DB.ventas.length} ventas · ${(DB.compras||[]).length} compras · ${(DB.documentos||[]).length} documentos</div></div>
       </div>
       <div class="ajuste-row">
-        <div><div class="ajuste-lbl">Exportar todo</div><div class="ajuste-sub">Descarga JSON de respaldo</div></div>
-        <button class="btn-sm" style="background:var(--sfc2);border:1px solid var(--border);color:var(--text)" onclick="exportarJSON()">📥 Backup</button>
+        <div><div class="ajuste-lbl">Backup sin cifrar</div><div class="ajuste-sub">JSON legible — no compartas este archivo</div></div>
+        <button class="btn-sm" style="background:var(--sfc2);border:1px solid var(--border);color:var(--text)" onclick="exportarJSON()">📥</button>
+      </div>
+      <div class="ajuste-row">
+        <div><div class="ajuste-lbl">Backup encriptado</div><div class="ajuste-sub">AES-256 con contraseña — recomendado</div></div>
+        <button class="btn-sm" style="background:var(--adim);color:var(--accent);border:1px solid rgba(68,147,248,.3)" onclick="exportarEncriptado()">🔐</button>
+      </div>
+      <div class="ajuste-row">
+        <div><div class="ajuste-lbl">Restaurar backup</div><div class="ajuste-sub">JSON o encriptado (.json)</div></div>
+        <button class="btn-sm" style="background:var(--sfc2);border:1px solid var(--border);color:var(--text)" onclick="importarJSON()">📂</button>
       </div>
       <div class="ajuste-row" style="border:none">
-        <div><div class="ajuste-lbl" style="color:var(--red)">Borrar todo</div><div class="ajuste-sub">Elimina todas las ventas</div></div>
+        <div><div class="ajuste-lbl" style="color:var(--red)">Borrar todo</div><div class="ajuste-sub">Elimina todas las ventas — irreversible</div></div>
         <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="borrarTodo()">Borrar</button>
       </div>
     </div>
 
     <div style="text-align:center;font-size:.72em;color:var(--dim);padding:12px 0 4px">
-      💡 Para instalar como app: Chrome → Menú → "Añadir a pantalla de inicio"
+      💡 Para instalar como app: Chrome → Menú → "Añadir a pantalla de inicio"<br>
+      🔍 Ctrl+K busca globalmente · Ctrl+N nueva venta
     </div>
   `;
 }
@@ -2613,9 +2737,13 @@ function actualizarLogo() {
   const wrap = document.getElementById('hdr-icon-wrap');
   if (!wrap) return;
   if (DB.config.logo) {
-    wrap.innerHTML = `<img src="${DB.config.logo}" alt="Logo">`;
+    wrap.textContent = '';
+    const img = document.createElement('img');
+    img.alt = 'Logo';
+    img.src = DB.config.logo;
+    wrap.appendChild(img);
   } else {
-    wrap.innerHTML = '🥩';
+    wrap.textContent = '🥩';
   }
 }
 
@@ -2682,6 +2810,87 @@ function exportarJSON() {
   const a    = document.createElement('a');
   a.href = url; a.download = 'ventas-backup-'+hoy()+'.json';
   a.click(); URL.revokeObjectURL(url);
+  toast('📥 Backup descargado');
+}
+
+async function exportarEncriptado() {
+  const pass = prompt('Contraseña para el backup (mín. 4 caracteres):');
+  if (!pass || pass.length < 4) { toast('Contraseña muy corta', true); return; }
+  try {
+    const enc  = new TextEncoder();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const km   = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey']);
+    const key  = await crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' },
+      km, { name:'AES-GCM', length:256 }, false, ['encrypt']
+    );
+    const ct   = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, enc.encode(JSON.stringify(DB)));
+    const payload = { v:1, salt:[...salt], iv:[...iv], data:[...new Uint8Array(ct)] };
+    const blob = new Blob([JSON.stringify(payload)], { type:'application/json' });
+    const a    = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ventas-enc-'+hoy()+'.json';
+    a.click();
+    toast('🔐 Backup encriptado descargado');
+  } catch(e) { toast('Error al encriptar', true); }
+}
+
+function importarJSON() {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const text = await file.text();
+      const raw  = JSON.parse(text);
+      // Auto-detect encrypted backup
+      if (raw.v === 1 && raw.salt && raw.iv && raw.data) {
+        await _importarEncriptado(raw);
+      } else {
+        _aplicarBackup(raw);
+      }
+    } catch(err) { toast('Archivo inválido', true); }
+  };
+  inp.click();
+}
+
+async function _importarEncriptado(payload) {
+  const pass = prompt('Contraseña del backup encriptado:');
+  if (!pass) return;
+  try {
+    const enc  = new TextEncoder();
+    const salt = new Uint8Array(payload.salt);
+    const iv   = new Uint8Array(payload.iv);
+    const ct   = new Uint8Array(payload.data);
+    const km   = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey']);
+    const key  = await crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' },
+      km, { name:'AES-GCM', length:256 }, false, ['decrypt']
+    );
+    const plain = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct);
+    _aplicarBackup(JSON.parse(new TextDecoder().decode(plain)));
+  } catch(e) { toast('Contraseña incorrecta o archivo dañado', true); }
+}
+
+function _aplicarBackup(p) {
+  if (!confirm('¿Restaurar backup? Los datos actuales se reemplazarán.')) return;
+  if (Array.isArray(p.ventas))     DB.ventas      = p.ventas;
+  if (Array.isArray(p.clientes))   DB.clientes    = p.clientes;
+  if (Array.isArray(p.productos) && p.productos.length) DB.productos = p.productos;
+  if (p.unidades  && typeof p.unidades==='object')      DB.unidades      = p.unidades;
+  if (p.precios   && typeof p.precios==='object')       DB.precios       = p.precios;
+  if (p.preciosPie && typeof p.preciosPie==='object')   DB.preciosPie    = p.preciosPie;
+  if (p.preciosCompra && typeof p.preciosCompra==='object') DB.preciosCompra = p.preciosCompra;
+  if (Array.isArray(p.compras))    DB.compras     = p.compras;
+  if (Array.isArray(p.proveedores)) DB.proveedores = p.proveedores;
+  if (Array.isArray(p.documentos)) DB.documentos  = p.documentos;
+  if (p.config && typeof p.config==='object') {
+    const pinCfg = { pinEnabled:DB.config.pinEnabled, pinHash:DB.config.pinHash, pinSalt:DB.config.pinSalt };
+    DB.config = { ...DB.config, ...p.config, ...pinCfg };
+  }
+  guardar(); applyTheme(); render();
+  toast('✅ Backup restaurado');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2816,8 +3025,14 @@ function abrirRecibo() {
 
 function imprimirRecibo() {
   setTimeout(() => {
-    try { window.print(); }
-    catch(e) { toast('Verifica que la impresora Bluetooth esté conectada.', true); }
+    try {
+      window.print();
+      // Clear print zone after print for privacy
+      setTimeout(() => {
+        const pz = document.getElementById('print-zone');
+        if (pz) pz.innerHTML = '';
+      }, 2000);
+    } catch(e) { toast('Verifica que la impresora Bluetooth esté conectada.', true); }
   }, 150);
 }
 
@@ -3728,8 +3943,187 @@ function guardarDesdeEditor() {
 }
 
 function cancelarDocEditor() {
+  if (DE.canvas) {
+    DE.canvas.removeEventListener('pointerdown',   editorPointerDown);
+    DE.canvas.removeEventListener('pointermove',   editorPointerMove);
+    DE.canvas.removeEventListener('pointerup',     editorPointerUp);
+    DE.canvas.removeEventListener('pointercancel', editorPointerUp);
+  }
   DE.cb=null; DE.original=null; DE.canvas=null; DE.ctx=null;
   closeModal('m-doc-editor');
+}
+
+// ═══════════════════════════════════════════════════════════
+// SEGURIDAD — PIN + CIFRADO
+// ═══════════════════════════════════════════════════════════
+let _pinBuffer = '';
+let _pinIntentos = 0;
+let _pinBloqTs  = 0;
+let _inacTimer  = null;
+
+async function _hashPin(pin, salt) {
+  const data = new TextEncoder().encode(pin + salt);
+  const h    = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(h)));
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('pd'+i)?.classList.toggle('fill', i < _pinBuffer.length);
+  }
+}
+
+function pinDigito(d) {
+  if (_pinBuffer.length >= 8) return;
+  if (DB.config.haptics !== false) try { navigator.vibrate?.(6); } catch(e){}
+  _pinBuffer += d;
+  updatePinDots();
+  if (_pinBuffer.length >= 4) setTimeout(intentarDesbloqueo, 80);
+}
+
+function pinBorrar() {
+  _pinBuffer = _pinBuffer.slice(0,-1);
+  updatePinDots();
+}
+
+async function intentarDesbloqueo() {
+  const now = Date.now();
+  const err = document.getElementById('pin-error');
+  if (_pinBloqTs && now - _pinBloqTs < 30000) {
+    if (err) err.textContent = `Bloqueado ${Math.ceil((30000-(now-_pinBloqTs))/1000)}s`;
+    _pinBuffer = ''; updatePinDots(); return;
+  }
+  const h = await _hashPin(_pinBuffer, DB.config.pinSalt || '');
+  if (h === DB.config.pinHash) {
+    _pinBuffer = ''; _pinIntentos = 0;
+    if (err) err.textContent = '';
+    document.getElementById('lock-screen').style.display = 'none';
+    _resetInac();
+    render();
+  } else {
+    _pinIntentos++;
+    _pinBuffer = ''; updatePinDots();
+    if (_pinIntentos >= 5) {
+      _pinBloqTs = Date.now(); _pinIntentos = 0;
+      if (err) err.textContent = 'Demasiados intentos. Espera 30s.';
+    } else {
+      if (err) err.textContent = `PIN incorrecto (${5-_pinIntentos} restantes)`;
+    }
+  }
+}
+
+function bloquearApp() {
+  if (!DB.config.pinEnabled) return;
+  const ls = document.getElementById('lock-screen');
+  if (!ls) return;
+  _pinBuffer = ''; updatePinDots();
+  const err = document.getElementById('pin-error');
+  if (err) err.textContent = '';
+  const ln = document.getElementById('lock-negocio');
+  if (ln) ln.textContent = DB.config.negocio || 'Mis Ventas';
+  ls.style.display = 'flex';
+}
+
+function _resetInac() {
+  clearTimeout(_inacTimer);
+  if (!DB.config.pinEnabled || !DB.config.autoLockMin) return;
+  _inacTimer = setTimeout(bloquearApp, DB.config.autoLockMin * 60000);
+}
+
+async function configurarPin(pin) {
+  if (!pin || pin.length < 4) { toast('El PIN debe tener al menos 4 dígitos', true); return; }
+  const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+  DB.config.pinSalt = salt;
+  DB.config.pinHash = await _hashPin(pin, salt);
+  DB.config.pinEnabled = true;
+  guardar();
+  document.getElementById('btn-lock')?.style.removeProperty('display');
+  toast('🔒 PIN configurado');
+  goTo('ajustes');
+}
+
+function quitarPin() {
+  if (!confirm('¿Desactivar el PIN de seguridad?')) return;
+  DB.config.pinEnabled = false; DB.config.pinHash = ''; DB.config.pinSalt = '';
+  guardar();
+  document.getElementById('btn-lock').style.display = 'none';
+  toast('🔓 PIN eliminado');
+  goTo('ajustes');
+}
+
+function pedirNuevoPin() {
+  const pin = prompt('Nuevo PIN (4-8 dígitos):');
+  if (pin && /^\d{4,8}$/.test(pin)) configurarPin(pin);
+  else if (pin !== null) toast('Solo dígitos, mínimo 4', true);
+}
+
+// Bloqueo automático por inactividad y visibilidad
+['touchstart','pointerdown','keydown'].forEach(ev =>
+  document.addEventListener(ev, _resetInac, { passive:true })
+);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && DB.config.pinEnabled) bloquearApp();
+});
+
+// ═══════════════════════════════════════════════════════════
+// BÚSQUEDA GLOBAL
+// ═══════════════════════════════════════════════════════════
+let _busqRes = [];
+
+function abrirBusqueda() {
+  openModal('m-busqueda');
+  const inp = document.getElementById('busq-inp');
+  if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 100); }
+  busquedaGlobal('');
+}
+
+function busquedaGlobal(q) {
+  const el = document.getElementById('busq-resultados');
+  if (!el) return;
+  q = (q||'').trim().toLowerCase();
+  if (!q) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.84em;padding:8px 0">Escribe para buscar en ventas, clientes, productos y proveedores</div>';
+    _busqRes = []; return;
+  }
+  _busqRes = [];
+  // Ventas
+  (DB.ventas||[]).filter(v =>
+    v.cliente?.toLowerCase().includes(q) ||
+    v.items?.some(i => i.prod?.toLowerCase().includes(q)) ||
+    (v.nota||'').toLowerCase().includes(q)
+  ).slice(0,5).forEach(v => _busqRes.push({
+    tipo:'🧾 Venta', sub:`${v.cliente||'Sin nombre'} · ${fmt(neto(v))} · ${fmtFecha(v.fecha)}`,
+    act:() => { closeModal('m-busqueda'); ventaSelId = v.id; goTo('ventas'); }
+  }));
+  // Clientes
+  (DB.clientes||[]).filter(c => c.toLowerCase().includes(q)).slice(0,4).forEach(c => _busqRes.push({
+    tipo:'👤 Cliente', sub:c,
+    act:() => { closeModal('m-busqueda'); verCliente(c); }
+  }));
+  // Productos
+  (DB.productos||[]).filter(p => p.toLowerCase().includes(q)).slice(0,4).forEach(p => _busqRes.push({
+    tipo:'📦 Producto', sub:`${p}${(DB.precios||{})[p] ? ' · Venta: '+fmt(DB.precios[p]) : ''}`,
+    act:() => { closeModal('m-busqueda'); goTo('productos'); }
+  }));
+  // Proveedores
+  (DB.proveedores||[]).filter(p => p.toLowerCase().includes(q)).slice(0,3).forEach(p => _busqRes.push({
+    tipo:'🏭 Proveedor', sub:p,
+    act:() => { closeModal('m-busqueda'); verProveedor(p); }
+  }));
+  if (!_busqRes.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.84em;padding:8px 0">Sin resultados</div>';
+    return;
+  }
+  el.innerHTML = _busqRes.map((r, i) => `
+    <div class="srch-result" onclick="ejecutarBusqResult(${i})">
+      <div class="srch-tipo">${r.tipo}</div>
+      <div style="font-size:.88em;color:var(--text)">${esc(r.sub)}</div>
+    </div>`).join('');
+}
+
+function ejecutarBusqResult(i) {
+  const r = _busqRes[i];
+  if (r && typeof r.act === 'function') r.act();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3791,7 +4185,20 @@ const hdrFecha = new Date().toLocaleDateString('es',{weekday:'long',day:'numeric
 const hdrEl = document.getElementById('hdr-date');
 if (hdrEl) hdrEl.textContent = hdrFecha.charAt(0).toUpperCase()+hdrFecha.slice(1);
 
-render();
+// Offline badge sync
+if (!navigator.onLine) document.body.classList.add('offline');
+
+// Show/hide lock button
+if (DB.config.pinEnabled) {
+  document.getElementById('btn-lock')?.style.removeProperty('display');
+}
+
+if (DB.config.pinEnabled && DB.config.pinHash) {
+  bloquearApp();
+} else {
+  render();
+  _resetInac();
+}
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(()=>{});
