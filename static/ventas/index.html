@@ -4206,10 +4206,30 @@ function guardarCompra(proveedor) {
   });
   const nota = document.getElementById('compra-nota')?.value.trim() || '';
   if (!DB.compras) DB.compras = [];
-  DB.compras.unshift({ id:uid(), fecha:hoy(), ts:Date.now(), proveedor, items, facturaImg:compraPendingImg||'', nota });
+  const compraId = uid();
+  DB.compras.unshift({ id:compraId, fecha:hoy(), ts:Date.now(), proveedor, items, facturaImg:compraPendingImg||'', nota });
+
+  // Agregar entradas de inventario automáticamente por cada item de la compra
+  if (!DB.entradas)  DB.entradas  = [];
+  if (!DB.costosInv) DB.costosInv = {};
+  const ts = Date.now();
+  items.forEach((it, i) => {
+    if (it.costoUnit > 0) DB.costosInv[it.prod] = it.costoUnit;
+    DB.entradas.unshift({
+      id: compraId + '_' + i,  // id vinculado a la compra para poder borrarlas
+      compraId,                 // referencia para borrado en cascada
+      fecha: hoy(), ts: ts - i,
+      prod: it.prod, cant: it.cant,
+      variante: '',
+      costoUnit: it.costoUnit,
+      costo: it.costo,
+      nota: proveedor ? 'Compra · ' + proveedor : 'Compra'
+    });
+  });
+
   guardar(); vibrar();
   closeModal('m-compra');
-  toast('✅ Compra registrada — precios actualizados');
+  toast('✅ Compra registrada · Inventario actualizado');
   render();
 }
 
@@ -4257,11 +4277,12 @@ function ampliarImg(id) {
 }
 
 function borrarCompra(id) {
-  if (!confirm('¿Eliminar esta compra?')) return;
-  DB.compras = (DB.compras||[]).filter(x=>x.id!==id);
-  guardar(); toast('Compra eliminada', true);
+  if (!confirm('¿Eliminar esta compra? También se quitará del inventario.')) return;
+  DB.compras  = (DB.compras||[]).filter(x=>x.id!==id);
+  DB.entradas = (DB.entradas||[]).filter(e=>e.compraId!==id);
+  guardar(); toast('Compra eliminada del historial e inventario', true);
   closeModal('m-compra-det');
-  if (paginaActual==='compras') render();
+  if (paginaActual==='compras' || paginaActual==='inventario') render();
 }
 
 // ═══════════════════════════════════════════════════════════
