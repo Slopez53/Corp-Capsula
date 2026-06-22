@@ -925,6 +925,7 @@ let compraVisto  = null;   // proveedor name being viewed
 let compraMesNav = null;   // {y, m} for calendar nav
 let compraFechaV = null;   // specific date selected in calendar
 let compraItems  = [{ prod:'', cant:'', costoUnit:'', precioVenta:'', precioPie:'' }];
+let _editandoCompraId = null;
 let compraPendingImg = '';
 
 // ── Doc Editor ───────────────────────────────────────────────
@@ -1492,37 +1493,53 @@ function guardarVenta() {
 // HOY
 // ═══════════════════════════════════════════════════════════
 function renderHoy() {
-  const ventasHoy = DB.ventas.filter(v => v.fecha === hoy());
-  const total     = ventasHoy.reduce((s,v)=>s+neto(v),0);
-  const fiados    = ventasHoy.filter(v=>v.pago==='fiado'&&!v.fiadoPagado&&montoPendienteV(v)>0);
-  const totalFiado= fiados.reduce((s,v)=>s+montoPendienteV(v),0);
-  const cliSet    = new Set(ventasHoy.map(v=>v.cliente));
+  const ventasHoy  = DB.ventas.filter(v => v.fecha === hoy());
+  const total      = ventasHoy.reduce((s,v)=>s+neto(v),0);
+  const cobradoHoy = ventasHoy.filter(v=>v.pago!=='fiado'||v.fiadoPagado).reduce((s,v)=>s+neto(v),0)
+                   + ventasHoy.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+montoPagadoItems(v),0);
+  const fiados     = ventasHoy.filter(v=>v.pago==='fiado'&&!v.fiadoPagado&&montoPendienteV(v)>0);
+  const totalFiado = fiados.reduce((s,v)=>s+montoPendienteV(v),0);
+  const gastosHoy  = (DB.gastos||[]).filter(g=>(g.fecha||'').slice(0,10)===hoy());
+  const totalGastos= gastosHoy.reduce((s,g)=>s+(+g.monto||0),0);
+  const balance    = cobradoHoy - totalGastos;
+  const cliSet     = new Set(ventasHoy.map(v=>v.cliente).filter(Boolean));
 
   const prods = {};
   ventasHoy.forEach(v=>v.items.forEach(it=>{
     prods[it.prod] = (prods[it.prod]||0)+it.cant;
   }));
-  const top = Object.entries(prods).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const top = Object.entries(prods).sort((a,b)=>b[1]-a[1]).slice(0,4);
 
   return `
-    <div class="stats">
+    <div class="stats" style="grid-template-columns:1fr 1fr">
       <div class="stat green">
         <div class="stat-val">${fmt(total)}</div>
-        <div class="stat-lbl">Total neto hoy</div>
+        <div class="stat-lbl">Facturado hoy</div>
       </div>
-      <div class="stat accent">
-        <div class="stat-val">${ventasHoy.length}</div>
-        <div class="stat-lbl">Ventas</div>
-      </div>
-      <div class="stat">
-        <div class="stat-val">${cliSet.size}</div>
-        <div class="stat-lbl">Clientes</div>
-      </div>
-      <div class="stat">
-        <div class="stat-val">${Object.keys(prods).length}</div>
-        <div class="stat-lbl">Productos</div>
+      <div class="stat ${balance>=0?'accent':''}">
+        <div class="stat-val" style="color:${balance>=0?'var(--green)':'var(--red)'}">${fmt(balance)}</div>
+        <div class="stat-lbl">Balance neto</div>
       </div>
     </div>
+    ${ventasHoy.length||totalGastos>0?`
+    <div style="display:flex;gap:7px;margin-bottom:11px;font-size:.78em">
+      <div style="flex:1;background:var(--gdim);border:1px solid rgba(63,185,80,.25);border-radius:10px;padding:7px 10px;text-align:center">
+        <div style="font-weight:700;color:var(--green)">${fmt(cobradoHoy)}</div>
+        <div style="color:var(--muted);margin-top:1px">💵 Cobrado</div>
+      </div>
+      ${totalGastos>0?`<div style="flex:1;background:var(--rdim);border:1px solid rgba(248,81,73,.2);border-radius:10px;padding:7px 10px;text-align:center">
+        <div style="font-weight:700;color:var(--red)">${fmt(totalGastos)}</div>
+        <div style="color:var(--muted);margin-top:1px">💸 Gastos</div>
+      </div>`:''}
+      <div style="flex:1;background:var(--sfc);border:1px solid var(--border);border-radius:10px;padding:7px 10px;text-align:center">
+        <div style="font-weight:700">${ventasHoy.length}</div>
+        <div style="color:var(--muted);margin-top:1px">🛍️ Ventas</div>
+      </div>
+      ${cliSet.size>0?`<div style="flex:1;background:var(--sfc);border:1px solid var(--border);border-radius:10px;padding:7px 10px;text-align:center">
+        <div style="font-weight:700">${cliSet.size}</div>
+        <div style="color:var(--muted);margin-top:1px">👥 Clientes</div>
+      </div>`:''}
+    </div>`:''}
 
     ${totalFiado > 0 ? `
     <div class="fiado-banner">
@@ -1537,22 +1554,16 @@ function renderHoy() {
 
     ${top.length ? `
     <div class="card">
-      <div class="card-title">Más vendido hoy</div>
-      ${top.map(([p,c])=>{
-        const u = DB.unidades[p]||'';
-        return `<div class="prod-cat-item">
-          <span>${esc(p)}</span>
-          <span class="tag">${fmtCant(c)}${u?' '+u:''}</span>
-        </div>`;
-      }).join('')}
+      <div class="card-title">Lo más vendido</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${top.map(([p,c])=>{const u=DB.unidades[p]||'';return `<span style="background:var(--sfc2);border:1px solid var(--border);border-radius:20px;padding:5px 10px;font-size:.82em"><b>${esc(p)}</b> <span style="color:var(--accent)">${fmtCant(c)}${u?' '+u:''}</span></span>`;}).join('')}
+      </div>
     </div>` : ''}
 
-    <div class="section-title">
-      Ventas de hoy ${ventasHoy.length?`<span class="badge">${ventasHoy.length}</span>`:''}
-    </div>
-    ${ventasHoy.length
-      ? ventasHoy.map(v=>htmlCard(v)).join('')
-      : '<div class="empty"><div class="empty-ico">📭</div>Sin ventas hoy<br>Toca ➕ para registrar</div>'}
+    ${ventasHoy.length ? `
+    <div class="section-title">Ventas de hoy <span class="badge">${ventasHoy.length}</span></div>
+    ${ventasHoy.map(v=>htmlCard(v)).join('')}`
+      : '<div class="empty"><div class="empty-ico">📭</div>Sin ventas hoy<br><span style="font-size:.84em">Toca ➕ para registrar</span></div>'}
   `;
 }
 
@@ -3607,6 +3618,8 @@ function renderInventario() {
   if (!DB.costosInv) DB.costosInv = {};
 
   const prodsConStock = DB.productos.filter(p => stockActual(p) > 0).length;
+  const bajoStock     = DB.productos.filter(p => { const s=stockActual(p); return s>0 && s<=3; }).length;
+  const agotados      = DB.productos.filter(p => stockActual(p) <= 0).length;
   const valTotal      = valorTotalInventario();
   const maxStock      = Math.max(1, ...DB.productos.map(p => stockActual(p)));
 
@@ -3632,13 +3645,18 @@ function renderInventario() {
       </div>`;
     }).join('');
 
-    const cost = DB.costosInv[p] || 0;
-    const pVal = stTotal > 0 && cost > 0 && !vars.length ? fmt(stTotal * cost) : '';
+    const cost  = DB.costosInv[p] || 0;
+    const price = (DB.precios||{})[p] || 0;
+    const margin= cost>0&&price>0 ? Math.round((price-cost)/price*100) : null;
+    const pVal  = stTotal > 0 && cost > 0 && !vars.length ? fmt(stTotal * cost) : '';
+    const alertCol = stTotal<=0?'var(--red)':stTotal<=3?'var(--warn)':'';
 
-    return `<div style="padding:9px 0;border-bottom:1px solid var(--border)">
+    return `<div style="padding:9px 0;border-bottom:1px solid var(--border)${alertCol?';border-left:3px solid '+alertCol+';padding-left:8px':''}">
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="flex:1;font-weight:600;font-size:.9em">${esc(p)}${u?` <span class="unit-tag">${esc(u)}</span>`:''}</span>
-        <span style="font-weight:700;color:${col};min-width:54px;text-align:right">${fmtCant(stTotal)}${u?' '+esc(u):''}</span>
+        <span style="flex:1;font-weight:600;font-size:.9em">${esc(p)}${u?` <span class="unit-tag">${esc(u)}</span>`:''}
+          ${margin!==null?`<span style="font-size:.7em;color:${margin>=30?'var(--green)':margin>=15?'var(--warn)':'var(--red)'};margin-left:4px">${margin}%↑</span>`:''}
+        </span>
+        <span style="font-weight:700;color:${alertCol||col};min-width:54px;text-align:right">${fmtCant(stTotal)}${u?' '+esc(u):''}</span>
         ${!vars.length&&cost>0?`<span style="font-size:.78em;color:var(--muted);min-width:54px;text-align:right">${fmt(cost)}</span>`:'<span style="min-width:54px"></span>'}
         ${pVal?`<span style="font-size:.8em;color:var(--accent);font-weight:700;min-width:64px;text-align:right">${pVal}</span>`:'<span style="min-width:64px"></span>'}
         <button class="btn-sm" style="background:var(--gdim);color:var(--green);border:1px solid rgba(63,185,80,.3);flex-shrink:0" onclick="abrirEntrada('${esc(p)}')">＋</button>
@@ -3664,9 +3682,15 @@ function renderInventario() {
 
   return `
     <div class="section-title">📦 Inventario</div>
-    <div class="stats">
+    <div class="stats" style="grid-template-columns:repeat(3,1fr)">
       <div class="stat green"><div class="stat-val">${prodsConStock}</div><div class="stat-lbl">Con stock</div></div>
       <div class="stat accent"><div class="stat-val">${fmt(valTotal)}</div><div class="stat-lbl">Valor (costo)</div></div>
+      <div class="stat ${bajoStock>0||agotados>0?'':''}">
+        <div class="stat-val" style="color:${agotados>0?'var(--red)':bajoStock>0?'var(--warn)':'var(--green)'}">
+          ${agotados>0?agotados+' agotado'+(agotados!==1?'s':''):bajoStock>0?bajoStock+' bajo':'✓'}
+        </div>
+        <div class="stat-lbl">Alertas</div>
+      </div>
     </div>
     <button class="btn btn-surface" style="width:100%;margin-bottom:12px;font-size:.86em" onclick="generarPDFInventario()">📄 Exportar PDF del inventario</button>
     <div class="card">
@@ -4076,6 +4100,7 @@ function renderDetalleProveedor(nombre) {
 }
 
 function abrirCompra(proveedor) {
+  _editandoCompraId = null;
   compraItems = [{ prod:'', cant:'', costoUnit:'', precioVenta:'', precioPie:'' }];
   compraPendingImg = '';
   pintarCompraForm(proveedor);
@@ -4127,7 +4152,7 @@ function pintarCompraForm(proveedor) {
 
   const totalCompra = compraItems.reduce((s,it)=>s+(+it.costoUnit||0)*(+it.cant||0),0);
   el.innerHTML = `
-    <div style="font-size:.84em;font-weight:700;color:var(--accent);margin-bottom:12px">🏭 ${esc(proveedor)}</div>
+    <div style="font-size:.84em;font-weight:700;color:var(--accent);margin-bottom:12px">🏭 ${esc(proveedor)}${_editandoCompraId?' <span style="color:var(--warn);font-size:.85em">(Editando)</span>':''}</div>
     <div class="card-title" style="margin-bottom:7px">Productos comprados</div>
     <div id="compra-filas">${filas}</div>
     <button class="btn btn-surface" style="margin-top:7px;font-size:.86em" onclick="compraItems.push({prod:'',cant:'',costoUnit:'',precioVenta:'',precioPie:''});pintarCompraForm('${esc(proveedor)}')">＋ Agregar producto</button>
@@ -4206,6 +4231,12 @@ function guardarCompra(proveedor) {
   });
   const nota = document.getElementById('compra-nota')?.value.trim() || '';
   if (!DB.compras) DB.compras = [];
+  // Si estamos editando, eliminamos la compra anterior y sus entradas
+  if (_editandoCompraId) {
+    DB.compras  = DB.compras.filter(x => x.id !== _editandoCompraId);
+    DB.entradas = (DB.entradas||[]).filter(e => e.compraId !== _editandoCompraId);
+    _editandoCompraId = null;
+  }
   const compraId = uid();
   DB.compras.unshift({ id:compraId, fecha:hoy(), ts:Date.now(), proveedor, items, facturaImg:compraPendingImg||'', nota });
 
@@ -4263,9 +4294,31 @@ function verCompra(id) {
       <div style="font-size:.78em;color:var(--muted);margin-bottom:6px">📷 Factura escaneada</div>
       <img src="${c.facturaImg}" style="width:100%;border-radius:var(--radius);display:block;cursor:pointer" onclick="ampliarImg('${esc(c.id)}')">
     </div>`:''}
-    <button class="btn btn-red" style="margin-top:13px;font-size:.86em" onclick="borrarCompra('${esc(c.id)}')">🗑️ Eliminar esta compra</button>
+    <div style="display:flex;gap:7px;margin-top:13px">
+      <button class="btn btn-surface" style="flex:1;font-size:.86em" onclick="editarCompra('${esc(c.id)}')">✏️ Editar</button>
+      <button class="btn btn-red" style="flex:1;font-size:.86em" onclick="borrarCompra('${esc(c.id)}')">🗑️ Eliminar</button>
+    </div>
   `;
   openModal('m-compra-det');
+}
+
+function editarCompra(id) {
+  const c = (DB.compras||[]).find(x => x.id === id);
+  if (!c) return;
+  _editandoCompraId = id;
+  compraItems = (c.items||[]).map(it => ({
+    prod:       it.prod,
+    cant:       String(it.cant),
+    costoUnit:  String(it.costoUnit  || ''),
+    precioVenta:String(it.precioVenta|| ''),
+    precioPie:  String(it.precioPie  || '')
+  }));
+  compraPendingImg = c.facturaImg || '';
+  closeModal('m-compra-det');
+  pintarCompraForm(c.proveedor);
+  const notaEl = document.getElementById('compra-nota');
+  if (notaEl) notaEl.value = c.nota || '';
+  openModal('m-compra');
 }
 
 function ampliarImg(id) {
