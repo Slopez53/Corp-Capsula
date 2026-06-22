@@ -570,6 +570,9 @@ body.offline .offline-badge{display:inline}
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('ajustes')">
         <span class="mas-ico">⚙️</span><span class="mas-lbl">Ajustes</span>
       </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');abrirGasto()">
+        <span class="mas-ico">💸</span><span class="mas-lbl">Gasto</span>
+      </button>
     </div>
   </div>
 </div>
@@ -613,6 +616,26 @@ body.offline .offline-badge{display:inline}
     <input type="search" id="busq-inp" placeholder="Ventas, clientes, productos, proveedores..."
       oninput="busquedaGlobal(this.value)" autocomplete="off" style="margin-bottom:0">
     <div id="busq-resultados" style="margin-top:11px;max-height:55vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- Modal: gasto rápido -->
+<div class="modal-bg" id="m-gasto" onclick="bgClose(event,'m-gasto')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-gasto')">✕</button>
+    <div class="modal-title">💸 Gasto Rápido</div>
+    <input type="text" id="gasto-desc" placeholder="Descripción del gasto" autocomplete="off" style="margin-bottom:10px">
+    <input type="number" id="gasto-monto" placeholder="Monto" inputmode="decimal" style="margin-bottom:10px">
+    <select id="gasto-cat" style="margin-bottom:16px">
+      <option value="operativo">Operativo</option>
+      <option value="transporte">Transporte</option>
+      <option value="insumos">Insumos</option>
+      <option value="nomina">Nómina</option>
+      <option value="servicios">Servicios</option>
+      <option value="otro">Otro</option>
+    </select>
+    <button class="btn-prim" onclick="guardarGasto()">Guardar Gasto</button>
   </div>
 </div>
 
@@ -1183,8 +1206,13 @@ function cambiarProd(i, sel) {
     if (!vF.items[i].precio) {
       const cp = (DB.precios||{})[sel.value];
       const ult = cp || ultimoPrecio(sel.value);
-      if (ult) { vF.items[i].precio = ult; refrescarFilas(); }
+      if (ult) { vF.items[i].precio = ult; }
     }
+    if (!vF.items[i].cant || vF.items[i].cant === 1) {
+      const sug = cantidadSugerida(sel.value);
+      if (sug > 1) vF.items[i].cant = sug;
+    }
+    refrescarFilas();
     calcTotal();
   }
 }
@@ -1235,6 +1263,28 @@ function renderVenta() {
   ];
 
   return `
+    ${(()=>{
+      const vh = DB.ventas.filter(v=>v.fecha===hoy());
+      const th = vh.reduce((s,v)=>s+neto(v),0);
+      const fh = vh.filter(v=>v.pago==='fiado'&&!v.fiadoPagado&&montoPendienteV(v)>0);
+      const tf = fh.reduce((s,v)=>s+montoPendienteV(v),0);
+      if (!vh.length && !tf) return '';
+      return `<div style="display:flex;gap:6px;margin-bottom:11px">
+        <div class="stat green" style="flex:1;margin:0;padding:8px">
+          <div class="stat-val" style="font-size:1em">${fmt(th)}</div>
+          <div class="stat-lbl">Hoy</div>
+        </div>
+        <div class="stat accent" style="flex:0 0 auto;margin:0;padding:8px 12px">
+          <div class="stat-val" style="font-size:1em">${vh.length}</div>
+          <div class="stat-lbl">Ventas</div>
+        </div>
+        ${tf>0?`<div class="stat" style="flex:1;margin:0;padding:8px;background:rgba(210,153,34,.1);border-color:var(--warn)">
+          <div class="stat-val" style="font-size:.9em;color:var(--warn)">${fmt(tf)}</div>
+          <div class="stat-lbl" style="color:var(--warn)">Fiado</div>
+        </div>`:''}
+      </div>`;
+    })()}
+
     ${ultima ? `
     <div style="background:var(--adim);border:1px solid rgba(68,147,248,.2);border-radius:var(--radius);
       padding:9px 12px;margin-bottom:11px;display:flex;justify-content:space-between;align-items:center">
@@ -1248,6 +1298,14 @@ function renderVenta() {
       <input list="cli-dl" id="input-cliente" placeholder="Nombre del cliente"
         value="${esc(vF.cliente)}" autocomplete="off" oninput="verificarDeudaVenta()">
       <datalist id="cli-dl">${cliOps}</datalist>
+      ${(()=>{
+        const freq = {};
+        DB.ventas.slice(0,60).forEach(v=>{ if(v.cliente) freq[v.cliente]=(freq[v.cliente]||0)+1; });
+        const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,4).map(e=>e[0]);
+        return top.length ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">
+          ${top.map(c=>`<button class="price-pill" onclick="seleccionarCliente('${esc(c)}')">${esc(c)}</button>`).join('')}
+        </div>` : '';
+      })()}
     </div>
 
     <div id="deuda-aviso-venta" class="deuda-aviso"
@@ -1392,6 +1450,8 @@ function renderHoy() {
       <div class="fiado-banner-val">${fmt(totalFiado)}</div>
     </div>` : ''}
 
+    ${insightsHoy(ventasHoy)}
+
     ${top.length ? `
     <div class="card">
       <div class="card-title">Más vendido hoy</div>
@@ -1493,6 +1553,14 @@ function htmlCard(v) {
   const totalHtml = devTotal(v)>0
     ? `<span style="text-decoration:line-through;color:var(--muted);font-size:.8em;font-weight:400">${fmt(v.total)}</span> ${fmt(neto(v))}`
     : fmt(v.total);
+  const pendiente = v.pago === 'fiado' && !v.fiadoPagado && montoPendienteV(v) > 0;
+  const quickCobrar = pendiente ? `
+    <div style="display:flex;gap:6px;border-top:1px solid var(--border);padding-top:8px;margin-top:7px" onclick="event.stopPropagation()">
+      <button style="flex:1;background:var(--green);color:#fff;border:none;border-radius:10px;padding:7px 10px;font-size:.82em;font-weight:700;cursor:pointer;font-family:inherit"
+        onclick="cobrarTodoRapido('${esc(v.id)}')">⚡ Cobrar ${fmt(montoPendienteV(v))}</button>
+      <button style="background:var(--sfc2);border:1px solid var(--border);border-radius:10px;padding:7px 10px;font-size:.82em;cursor:pointer;font-family:inherit"
+        onclick="abrirCobro('${esc(v.id)}')">Parcial</button>
+    </div>` : '';
   return `<div class="${cls}" onclick="verDetalle('${esc(v.id)}')">
     <div class="venta-top">
       <span class="venta-cliente">👤 ${esc(v.cliente)}</span>
@@ -1500,6 +1568,7 @@ function htmlCard(v) {
     </div>
     <div class="venta-meta">${fmtFecha(v.fecha)} · ${fmtHora(v.ts)} ${pagoLbl}${devLbl}</div>
     <div class="venta-prods">${prodsStr}</div>
+    ${quickCobrar}
   </div>`;
 }
 
@@ -2255,6 +2324,7 @@ let _rep = { lbl:'', desde:'', hasta:'' };
 function renderInforme() {
   let r1, r2, lbl1, lbl2;
   if (compareMode==='semanas')     { r1=semanaActual();  r2=semanaPasada(); lbl1='Esta semana'; lbl2='Sem. pasada'; }
+
   else if (compareMode==='meses')  { r1=mesActual();     r2=mesPasado();    lbl1='Este mes';    lbl2='Mes pasado'; }
   else {
     r1=[infPers.desde1||hoy(), infPers.hasta1||hoy()];
@@ -2316,6 +2386,8 @@ function renderInforme() {
     </div>` : '';
 
   return `
+    ${resumenSemanaIA(v1, v2, lbl1, lbl2)}
+
     <div class="compare-tabs">
       <button class="compare-tab${compareMode==='semanas'?' active':''}" onclick="compareMode='semanas';goTo('informe')">Semanas</button>
       <button class="compare-tab${compareMode==='meses'?' active':''}" onclick="compareMode='meses';goTo('informe')">Meses</button>
@@ -2445,19 +2517,8 @@ function setPrecioCompra(idx, val) {
 // ═══════════════════════════════════════════════════════════
 function renderAjustes() {
 
-  const cliList = DB.clientes.length
-    ? DB.clientes.map((c,i)=>`
-        <div class="prod-cat-item">
-          <span>👤 ${esc(c)}</span>
-          <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="quitarCli(${i})">✕</button>
-        </div>`).join('')
-    : '<div style="color:var(--muted);font-size:.82em;padding:7px 0">Se agregan al guardar ventas</div>';
-
   const palNombres = { blue:'Azul', green:'Verde', purple:'Morado', orange:'Naranja', red:'Rojo' };
   const palColores = { blue:'#4493f8', green:'#3fb950', purple:'#a371f7', orange:'#f0883e', red:'#e05252' };
-
-  const fiadosPend  = DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado&&montoPendienteV(v)>0);
-  const totalFiado  = fiadosPend.reduce((s,v)=>s+montoPendienteV(v),0);
 
   return `
     <!-- Logo y negocio -->
@@ -2599,44 +2660,6 @@ function renderAjustes() {
         <label class="input-label">Mensaje en pie de recibo</label>
         <textarea placeholder="Ej: ¡Gracias por su compra! · WhatsApp: 300 123 4567" rows="2"
           oninput="DB.config.receiptFooter=this.value;guardar()">${esc(DB.config.receiptFooter||'')}</textarea>
-      </div>
-    </div>
-
-    ${totalFiado>0 ? `
-    <div class="card">
-      <div class="card-title">Fiados pendientes</div>
-      <div class="fiado-banner" style="margin-bottom:0">
-        <div><div class="fiado-banner-lbl">${fiadosPend.length} sin cobrar</div></div>
-        <div class="fiado-banner-val">${fmt(totalFiado)}</div>
-      </div>
-      <div style="margin-top:9px">
-        ${fiadosPend.slice(0,5).map(v=>`
-          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:.86em">
-            <span>👤 ${esc(v.cliente)} <span style="color:var(--muted);font-size:.83em">${fmtFecha(v.fecha)}</span></span>
-            <span style="color:var(--warn);font-weight:700">${fmt(neto(v))}</span>
-          </div>`).join('')}
-      </div>
-    </div>` : ''}
-
-    <!-- shortcut to Productos -->
-    <div class="card" style="background:var(--adim);border-color:rgba(68,147,248,.3)">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-weight:700;font-size:.9em">📦 Registro de productos</div>
-          <div style="font-size:.75em;color:var(--muted);margin-top:2px">${DB.productos.length} productos en catálogo</div>
-        </div>
-        <button class="btn-sm" style="background:var(--accent);color:#fff" onclick="goTo('productos')">Abrir →</button>
-      </div>
-    </div>
-
-    <!-- Clientes -->
-    <div class="card">
-      <div class="card-title">Clientes guardados</div>
-      <div id="cli-cat">${cliList}</div>
-      <div class="add-row">
-        <input type="text" id="inp-cli" placeholder="Nuevo cliente..."
-          onkeypress="if(event.key==='Enter'){event.preventDefault();addCli()}">
-        <button class="btn-sm btn-green" onclick="addCli()">＋</button>
       </div>
     </div>
 
@@ -4124,6 +4147,138 @@ function busquedaGlobal(q) {
 function ejecutarBusqResult(i) {
   const r = _busqRes[i];
   if (r && typeof r.act === 'function') r.act();
+}
+
+// ═══════════════════════════════════════════════════════════
+// AI + QUICK-ACTION HELPERS
+// ═══════════════════════════════════════════════════════════
+
+// Inline cobro: marks fiado as paid with a single tap (2 steps instead of 5)
+function cobrarTodoRapido(id) {
+  const v = DB.ventas.find(x => x.id === id);
+  if (!v) return;
+  const monto = montoPendienteV(v);
+  v.fiadoPagado = true;
+  v.itemsPagados = (v.items||[]).map((_,i) => i);
+  guardar(); vibrar();
+  toast('✅ Cobrado ' + fmt(monto) + (v.cliente ? ' · ' + v.cliente : ''));
+  render();
+}
+
+// Client chip tap in venta form — sets customer without navigating away
+function seleccionarCliente(c) {
+  vF.cliente = c;
+  const inp = document.getElementById('input-cliente');
+  if (inp) { inp.value = c; inp.dispatchEvent(new Event('input')); }
+  verificarDeudaVenta();
+}
+
+// AI: average quantity sold per transaction for a product (last 30 sales)
+function cantidadSugerida(prod) {
+  const qtys = [];
+  for (let i = DB.ventas.length - 1; i >= 0 && qtys.length < 30; i--) {
+    const v = DB.ventas[i];
+    (v.items||[]).forEach(it => { if (it.prod === prod && it.cant > 0) qtys.push(+it.cant); });
+  }
+  if (!qtys.length) return 1;
+  return Math.round(qtys.reduce((s,q) => s+q, 0) / qtys.length * 10) / 10;
+}
+
+// AI: returns product sale frequency map over last N ventas
+function _freqProd(n) {
+  const freq = {};
+  DB.ventas.slice(-n).forEach(v => (v.items||[]).forEach(it => {
+    if (it.prod) freq[it.prod] = (freq[it.prod]||0) + 1;
+  }));
+  return freq;
+}
+
+// AI insights card for Hoy page
+function insightsHoy(ventasHoy) {
+  if (!ventasHoy.length) return '';
+  // best product today
+  const freq = {};
+  ventasHoy.forEach(v => (v.items||[]).forEach(it => {
+    if (it.prod) freq[it.prod] = (freq[it.prod]||0) + (+it.cant||1);
+  }));
+  const topProd = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0];
+  // compare with 7-day average
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const semana = DB.ventas.filter(v => {
+    const d = new Date(v.fecha); d.setHours(0,0,0,0);
+    return d < hoy && d >= new Date(hoy - 6*864e5);
+  });
+  const promDia = semana.length ? semana.reduce((s,v)=>s+neto(v),0) / 7 : 0;
+  const totalHoy = ventasHoy.reduce((s,v)=>s+neto(v),0);
+  const diff = promDia > 0 ? ((totalHoy - promDia) / promDia * 100).toFixed(0) : null;
+  const diffTxt = diff !== null
+    ? (diff >= 0
+      ? `<span style="color:var(--green)">▲ ${diff}% vs promedio sem.</span>`
+      : `<span style="color:var(--red)">▼ ${Math.abs(diff)}% vs promedio sem.</span>`)
+    : '';
+  // hour heatmap (peak hour)
+  const byHour = {};
+  ventasHoy.forEach(v => { const h = new Date(v.fecha).getHours(); byHour[h]=(byHour[h]||0)+1; });
+  const peakH = Object.entries(byHour).sort((a,b)=>b[1]-a[1])[0];
+  const peakTxt = peakH ? `Hora pico: <b>${peakH[0]}:00</b>` : '';
+  return `<div class="card" style="margin-bottom:12px;border-left:3px solid var(--accent)">
+    <div style="font-size:.78em;font-weight:700;color:var(--accent);margin-bottom:6px;letter-spacing:.05em">🤖 IA · RESUMEN DEL DÍA</div>
+    ${topProd ? `<div style="font-size:.86em;margin-bottom:4px">⭐ Más vendido: <b>${esc(topProd[0])}</b> (×${topProd[1]})</div>` : ''}
+    ${diffTxt ? `<div style="font-size:.84em;margin-bottom:4px">${diffTxt}</div>` : ''}
+    ${peakTxt ? `<div style="font-size:.82em;color:var(--muted)">${peakTxt}</div>` : ''}
+  </div>`;
+}
+
+// AI summary card for Informe page — compares two periods
+function resumenSemanaIA(v1, v2, lbl1, lbl2) {
+  if (!v1.length && !v2.length) return '';
+  const t1 = v1.reduce((s,v)=>s+neto(v),0);
+  const t2 = v2.reduce((s,v)=>s+neto(v),0);
+  const delta = t2 > 0 ? ((t1-t2)/t2*100).toFixed(0) : null;
+  const deltaTxt = delta !== null
+    ? (delta >= 0
+      ? `<span style="color:var(--green)">▲ ${delta}% vs ${esc(lbl2)}</span>`
+      : `<span style="color:var(--red)">▼ ${Math.abs(delta)}% vs ${esc(lbl2)}</span>`)
+    : '';
+  // top product in period 1
+  const freq = _freqProd(0); // unused — compute from v1 directly
+  const fq1 = {};
+  v1.forEach(v=>(v.items||[]).forEach(it=>{ if(it.prod) fq1[it.prod]=(fq1[it.prod]||0)+(+it.cant||1); }));
+  const top1 = Object.entries(fq1).sort((a,b)=>b[1]-a[1])[0];
+  // client who bought most
+  const cliF = {};
+  v1.forEach(v=>{ if(v.cliente) cliF[v.cliente]=(cliF[v.cliente]||0)+1; });
+  const topCli = Object.entries(cliF).sort((a,b)=>b[1]-a[1])[0];
+  // avg ticket
+  const avgTick = v1.length ? (t1/v1.length).toFixed(0) : 0;
+  return `<div class="card" style="margin-bottom:12px;border-left:3px solid var(--accent)">
+    <div style="font-size:.78em;font-weight:700;color:var(--accent);margin-bottom:6px;letter-spacing:.05em">🤖 IA · ANÁLISIS DEL PERÍODO</div>
+    ${deltaTxt ? `<div style="font-size:.86em;margin-bottom:4px">${deltaTxt}</div>` : ''}
+    ${top1 ? `<div style="font-size:.84em;margin-bottom:4px">⭐ Estrella: <b>${esc(top1[0])}</b> (×${top1[1]})</div>` : ''}
+    ${topCli ? `<div style="font-size:.84em;margin-bottom:4px">👤 Cliente frecuente: <b>${esc(topCli[0])}</b> (${topCli[1]} compras)</div>` : ''}
+    ${avgTick > 0 ? `<div style="font-size:.82em;color:var(--muted)">Ticket promedio: <b>${fmt(avgTick)}</b></div>` : ''}
+  </div>`;
+}
+
+// Quick expense (gasto) — 2 taps to record an expense
+function abrirGasto() {
+  document.getElementById('gasto-desc').value = '';
+  document.getElementById('gasto-monto').value = '';
+  document.getElementById('gasto-cat').value = 'operativo';
+  openModal('m-gasto');
+  setTimeout(()=>document.getElementById('gasto-desc')?.focus(), 150);
+}
+
+function guardarGasto() {
+  const desc  = document.getElementById('gasto-desc').value.trim();
+  const monto = parseFloat(document.getElementById('gasto-monto').value);
+  const cat   = document.getElementById('gasto-cat').value;
+  if (!desc || !monto || monto <= 0) { toast('Completa descripción y monto', true); return; }
+  if (!DB.gastos) DB.gastos = [];
+  DB.gastos.push({ id: Date.now().toString(36), fecha: new Date().toISOString(), desc, monto, cat });
+  guardar(); vibrar();
+  closeModal('m-gasto');
+  toast('💸 Gasto guardado · ' + fmt(monto));
 }
 
 // ═══════════════════════════════════════════════════════════
