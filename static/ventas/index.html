@@ -632,6 +632,20 @@ body.offline .offline-badge{display:inline}
   </div>
 </div>
 
+<!-- Modal: info cliente -->
+<div class="modal-bg" id="m-cli-info" onclick="bgClose(event,'m-cli-info')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-cli-info')">✕</button>
+    <div class="modal-title" id="m-cli-info-title">✏️ Info del cliente</div>
+    <label class="input-label">Teléfono</label>
+    <input type="tel" id="cli-tel-inp" placeholder="Ej: 3001234567" inputmode="tel" style="margin-bottom:10px">
+    <label class="input-label">Notas / Dirección</label>
+    <input type="text" id="cli-nota-inp" placeholder="Dirección, referencia, detalles..." style="margin-bottom:16px">
+    <button class="btn-prim" onclick="guardarInfoCliente()">Guardar</button>
+  </div>
+</div>
+
 <!-- Modal: gasto rápido -->
 <div class="modal-bg" id="m-gasto" onclick="bgClose(event,'m-gasto')">
   <div class="modal">
@@ -853,6 +867,7 @@ let DB = {
     pinHash:        '',
     pinSalt:        '',
     autoLockMin:    5,
+    gdriveClientId: '',
   },
   productos: ['Salchichas','Chorizo','Jamón','Mortadela','Salami','Tocino','Longaniza','Butifarra'],
   unidades:      {},
@@ -864,6 +879,8 @@ let DB = {
   documentos: [],
   proveedores:[],
   compras:    [],
+  variantes:  {},
+  costosInv:  {},
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -939,6 +956,8 @@ function cargar() {
     DB.documentos = Array.isArray(p.documentos)  ? p.documentos  : [];
     DB.proveedores= Array.isArray(p.proveedores) ? p.proveedores : [];
     DB.compras    = Array.isArray(p.compras)     ? p.compras     : [];
+    DB.variantes  = (p.variantes  && typeof p.variantes==='object')  ? p.variantes  : {};
+    DB.costosInv  = (p.costosInv  && typeof p.costosInv==='object')  ? p.costosInv  : {};
     DB.config    = { ...DB.config, ...(p.config||{}) };
     DB.ventas.forEach((v,i) => {
       if (!v.numRecibo) v.numRecibo = i+1;
@@ -965,6 +984,11 @@ function cargar() {
     if (!DB.config.pinHash)                  DB.config.pinHash       = '';
     if (!DB.config.pinSalt)                  DB.config.pinSalt       = '';
     if (!DB.config.autoLockMin)              DB.config.autoLockMin   = 5;
+    if (!DB.config.gdriveClientId)          DB.config.gdriveClientId = '';
+    // Migrate clients: string[] → object[]
+    DB.clientes = DB.clientes.map(c =>
+      typeof c === 'string' ? { id: uid(), nombre: c, tel:'', ubicacion:null, notas:'' } : c
+    );
   } catch(e) { console.error('Error cargando:', e); }
 }
 
@@ -1021,6 +1045,9 @@ function esc(s) {
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+function clienteNombre(c) { return typeof c === 'string' ? c : (c?.nombre || ''); }
+function getClienteObj(nombre) { return DB.clientes.find(c => clienteNombre(c) === nombre) || null; }
 
 function fmtFecha(d) {
   if (!d) return '';
@@ -1210,6 +1237,13 @@ function htmlFilas() {
         ${pp ? `<button class="price-pill green" onclick="vF.items[${i}].precio=${pp};refrescarFilas();calcTotal()">🧍 Detal ${fmt(pp)}</button>` : ''}
       </div>` : '';
 
+    const varList   = it.prod && !it.custom ? ((DB.variantes||{})[it.prod]||[]) : [];
+    const varSelect = varList.length ? `
+      <select style="padding:6px 7px;font-size:.8em;margin-top:4px;color:var(--muted)" onchange="vF.items[${i}].variante=this.value">
+        <option value="">Sin variante</option>
+        ${varList.map(v=>`<option value="${esc(v)}" ${(it.variante||'')==v?'selected':''}>${esc(v)}</option>`).join('')}
+      </select>` : '';
+
     return `<div>
       <div class="prod-row">
         ${campo}
@@ -1222,6 +1256,7 @@ function htmlFilas() {
           oninput="vF.items[${i}].precio=+this.value||0;calcTotal()">
         ${del}
       </div>
+      ${varSelect}
       ${pricePills}
     </div>`;
   }).join('');
@@ -1283,7 +1318,7 @@ function setPago(p) {
 
 function renderVenta() {
   const total   = vF.items.reduce((s,it)=>s+((+it.cant||0)*(+it.precio||0)),0);
-  const cliOps  = DB.clientes.map(c=>`<option value="${esc(c)}">`).join('');
+  const cliOps  = DB.clientes.map(c=>`<option value="${esc(clienteNombre(c))}">`).join('');
   const hayDatos= vF.items.some(it=>it.prod||it.precio)||vF.cliente;
   const ultima  = DB.ventas[0];
 
@@ -1520,7 +1555,7 @@ function filtrarVentas() {
 function renderVentas() {
   const lista   = filtrarVentas();
   const total   = lista.reduce((s,v)=>s+neto(v),0);
-  const cliOps  = DB.clientes.map(c=>`<option value="${esc(c)}">`).join('');
+  const cliOps  = DB.clientes.map(c=>`<option value="${esc(clienteNombre(c))}">`).join('');
 
   return `
     <div style="margin-bottom:9px">
@@ -1669,6 +1704,132 @@ function renderClientes() {
   `;
 }
 
+let _editCliNombre = '';
+
+function editarClienteInfo(nombre) {
+  _editCliNombre = nombre;
+  const c = getClienteObj(nombre);
+  document.getElementById('m-cli-info-title').textContent = '✏️ ' + nombre;
+  document.getElementById('cli-tel-inp').value  = c?.tel   || '';
+  document.getElementById('cli-nota-inp').value = c?.notas || '';
+  openModal('m-cli-info');
+  setTimeout(() => document.getElementById('cli-tel-inp')?.focus(), 150);
+}
+
+function guardarInfoCliente() {
+  const tel  = document.getElementById('cli-tel-inp').value.trim();
+  const nota = document.getElementById('cli-nota-inp').value.trim();
+  let c = getClienteObj(_editCliNombre);
+  if (!c) {
+    c = { id: uid(), nombre: _editCliNombre, tel:'', ubicacion:null, notas:'' };
+    DB.clientes.push(c);
+  }
+  c.tel   = tel;
+  c.notas = nota;
+  guardar(); vibrar();
+  closeModal('m-cli-info');
+  toast('✅ Info guardada');
+  if (paginaActual === 'clientes') render();
+}
+
+function obtenerUbicacion(nombre) {
+  if (!navigator.geolocation) { toast('Geolocalización no disponible', true); return; }
+  toast('Obteniendo ubicación...');
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      let c = getClienteObj(nombre);
+      if (!c) {
+        c = { id: uid(), nombre, tel:'', ubicacion:null, notas:'' };
+        DB.clientes.push(c);
+      }
+      c.ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      guardar(); vibrar();
+      toast('📍 Ubicación guardada para ' + nombre);
+      if (paginaActual === 'clientes') render();
+    },
+    () => toast('No se pudo obtener la ubicación', true),
+    { timeout: 10000, enableHighAccuracy: true }
+  );
+}
+
+function compartirUbicacionWA(nombre, lat, lng) {
+  const mapsUrl = 'https://maps.google.com/?q=' + lat + ',' + lng;
+  const texto   = '📍 Ubicación de ' + nombre + ': ' + mapsUrl;
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+}
+
+function guardarContactoVCF(nombre) {
+  const c   = getClienteObj(nombre);
+  const tel = c?.tel || '';
+  const neg = DB.config.negocio || 'Cliente';
+  const vcf = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:' + nombre + '\r\nORG:' + neg + '\r\n'
+    + (tel ? 'TEL;TYPE=CELL:'+tel+'\r\n' : '')
+    + (c?.notas ? 'NOTE:'+c.notas+'\r\n' : '')
+    + 'END:VCARD';
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([vcf], { type: 'text/vcard' }));
+  a.download = nombre.replace(/\s+/g,'_') + '.vcf';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('📱 Contacto descargado como .vcf');
+}
+
+// ── Google Drive ─────────────────────────────────────────────
+async function _driveUpload(token, filename, content, mimeType) {
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify({name:filename})], {type:'application/json'}));
+  form.append('file',     new Blob([content], {type:mimeType}));
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method:'POST', headers:{Authorization:'Bearer '+token}, body:form
+  });
+  if (r.ok) toast('✅ Guardado en Google Drive');
+  else toast('Error al subir a Drive', true);
+}
+
+function _driveAuth(callback) {
+  const clientId = DB.config.gdriveClientId || '';
+  if (!clientId) { toast('Configura tu Google Client ID en Ajustes', true); goTo('ajustes'); return; }
+  const loadAndAuth = () => {
+    const tc = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: resp => {
+        if (resp.error) { toast('Error de autenticación con Google', true); return; }
+        callback(resp.access_token);
+      }
+    });
+    tc.requestAccessToken();
+  };
+  if (typeof google === 'undefined') {
+    const s = document.createElement('script');
+    s.src   = 'https://accounts.google.com/gsi/client';
+    s.onload  = loadAndAuth;
+    s.onerror = () => toast('Error cargando Google Auth', true);
+    document.head.appendChild(s);
+  } else { loadAndAuth(); }
+}
+
+function exportarBackupDrive() {
+  _driveAuth(token => {
+    const fecha    = new Date().toISOString().slice(0,10);
+    const filename = 'backup_' + (DB.config.negocio||'ventas').replace(/\s+/g,'_') + '_' + fecha + '.json';
+    _driveUpload(token, filename, JSON.stringify(DB), 'application/json');
+  });
+}
+
+function exportarInformeVentasDrive() {
+  _driveAuth(token => {
+    const fecha = new Date().toISOString().slice(0,10);
+    const data  = {
+      fecha, negocio: DB.config.negocio,
+      ventas: DB.ventas,
+      totalVentas: DB.ventas.reduce((s,v)=>s+neto(v),0),
+      totalFiado: DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+montoPendienteV(v),0)
+    };
+    _driveUpload(token, 'informe_ventas_'+fecha+'.json', JSON.stringify(data,null,2), 'application/json');
+  });
+}
+
 function primerFiadoPendiente(nombre) {
   const v = DB.ventas.find(v => v.cliente===nombre && v.pago==='fiado' && !v.fiadoPagado && montoPendienteV(v)>0);
   return v ? v.id : null;
@@ -1742,6 +1903,38 @@ function renderHistorialCliente(nombre) {
       </div>
       ${devol>0 ? `<div style="margin-top:7px;padding:8px;background:var(--rdim);border:1px solid rgba(248,81,73,.3);border-radius:8px;font-size:.82em;color:var(--red)">↩️ Devoluciones/averías: <b>${fmt(devol)}</b></div>` : ''}
     </div>
+
+    ${(()=>{
+      const co   = getClienteObj(nombre);
+      const tel  = co?.tel  || '';
+      const loc  = co?.ubicacion;
+      const nota = co?.notas || '';
+      return `<div class="card" style="margin-bottom:11px">
+        <div class="card-title">📋 Contacto</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:.8em;color:var(--muted);min-width:58px">Teléfono</span>
+          ${tel
+            ? `<a href="tel:${esc(tel)}" style="flex:1;font-size:.9em;color:var(--accent);font-weight:600">${esc(tel)}</a>
+               <button class="btn-sm" onclick="editarClienteInfo('${esc(nombre)}')">✏️</button>`
+            : `<span style="flex:1;color:var(--muted);font-size:.82em;font-style:italic">No registrado</span>
+               <button class="btn-sm" onclick="editarClienteInfo('${esc(nombre)}')">＋ Agregar</button>`}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:.8em;color:var(--muted);min-width:58px">Ubicación</span>
+          ${loc
+            ? `<a href="https://maps.google.com/?q=${loc.lat},${loc.lng}" target="_blank" style="flex:1;font-size:.82em;color:var(--accent)">Ver en mapa</a>
+               <button class="btn-sm" style="background:var(--gdim);color:var(--green);border:1px solid rgba(63,185,80,.3)" onclick="compartirUbicacionWA('${esc(nombre)}',${loc.lat},${loc.lng})">📤 WA</button>
+               <button class="btn-sm" onclick="obtenerUbicacion('${esc(nombre)}')">📍</button>`
+            : `<span style="flex:1;color:var(--muted);font-size:.82em;font-style:italic">No registrada</span>
+               <button class="btn-sm" onclick="obtenerUbicacion('${esc(nombre)}')">📍 Registrar</button>`}
+        </div>
+        ${nota ? `<div style="padding:8px 0;font-size:.82em;color:var(--muted)"><b style="color:var(--text)">Nota:</b> ${esc(nota)}</div>` : ''}
+        <div style="display:flex;gap:7px;margin-top:10px">
+          ${tel ? `<button class="btn btn-surface" style="flex:1;font-size:.81em" onclick="guardarContactoVCF('${esc(nombre)}')">📱 Guardar contacto</button>` : ''}
+          <button class="btn btn-surface" style="flex:1;font-size:.81em" onclick="editarClienteInfo('${esc(nombre)}')">✏️ Editar info</button>
+        </div>
+      </div>`;
+    })()}
 
     ${fiadosPend.length ? `
     <div class="card" style="border-color:rgba(248,81,73,.3);background:rgba(248,81,73,.04)">
@@ -2768,6 +2961,23 @@ function renderAjustes() {
       </div>` : ''}
     </div>
 
+    <!-- Google Drive -->
+    <div class="card">
+      <div class="card-title">☁️ Google Drive</div>
+      <div style="font-size:.78em;color:var(--muted);margin-bottom:10px;line-height:1.5">
+        Sube backups e informes directamente a tu Drive. Requiere un <b>Client ID</b> de Google Cloud Console.
+      </div>
+      <label class="input-label">Google OAuth Client ID</label>
+      <input type="text" placeholder="xxxx.apps.googleusercontent.com"
+        value="${esc(DB.config.gdriveClientId||'')}"
+        oninput="DB.config.gdriveClientId=this.value.trim();guardar()"
+        style="margin-bottom:12px;font-size:.8em">
+      <div style="display:flex;gap:7px">
+        <button class="btn btn-surface" style="flex:1;font-size:.82em" onclick="exportarBackupDrive()">☁️ Backup → Drive</button>
+        <button class="btn btn-surface" style="flex:1;font-size:.82em" onclick="exportarInformeVentasDrive()">📊 Ventas → Drive</button>
+      </div>
+    </div>
+
     <!-- Datos -->
     <div class="card">
       <div class="card-title">Datos y backup</div>
@@ -3222,55 +3432,226 @@ function actualizarNegocio() {
 // ═══════════════════════════════════════════════════════════
 // INVENTARIO
 // ═══════════════════════════════════════════════════════════
-function stockActual(prod) {
-  const entrado = (DB.entradas||[]).filter(e=>e.prod===prod).reduce((s,e)=>s+(+e.cant||0),0);
-  const vendido = DB.ventas.flatMap(v=>v.items).filter(it=>it.prod===prod).reduce((s,it)=>s+(+it.cant||0),0);
+function stockActual(prod, variante) {
+  const hasV = variante !== undefined;
+  const entrado = (DB.entradas||[])
+    .filter(e => e.prod===prod && (hasV ? (e.variante||'')===variante : true))
+    .reduce((s,e) => s+(+e.cant||0), 0);
+  const vendido = DB.ventas.flatMap(v=>v.items||[])
+    .filter(it => it.prod===prod && (hasV ? (it.variante||'')===variante : true))
+    .reduce((s,it) => s+(+it.cant||0), 0);
   return Math.round((entrado-vendido)*1000)/1000;
+}
+
+function valorTotalInventario() {
+  let total = 0;
+  if (!DB.variantes) DB.variantes = {};
+  if (!DB.costosInv) DB.costosInv = {};
+  DB.productos.forEach(p => {
+    const vars = DB.variantes[p] || [];
+    if (vars.length) {
+      vars.forEach(v => {
+        const st  = stockActual(p, v);
+        const key = p+'|'+v;
+        const c   = DB.costosInv[key] || DB.costosInv[p] || 0;
+        if (st > 0 && c > 0) total += st * c;
+      });
+    } else {
+      const st = stockActual(p);
+      const c  = DB.costosInv[p] || 0;
+      if (st > 0 && c > 0) total += st * c;
+    }
+  });
+  return total;
+}
+
+function generarPDFInventario() {
+  if (!DB.variantes) DB.variantes = {};
+  if (!DB.costosInv) DB.costosInv = {};
+  const negocio  = DB.config.negocio || 'Mis Ventas';
+  const fecha    = new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const hora     = new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  const valTotal = valorTotalInventario();
+
+  let rows = '';
+  DB.productos.forEach(p => {
+    const u    = DB.unidades[p] || '';
+    const vars = DB.variantes[p] || [];
+    if (vars.length) {
+      const stT = stockActual(p);
+      rows += `<tr style="background:#f8fafc;font-weight:700"><td colspan="4" style="padding:8px 10px;font-size:.88em">${p} — total ×${fmtCant(stT)}${u?' '+u:''}</td></tr>`;
+      vars.forEach(v => {
+        const stV  = stockActual(p, v);
+        const key  = p+'|'+v;
+        const cost = DB.costosInv[key] || DB.costosInv[p] || 0;
+        const val  = stV > 0 && cost > 0 ? stV * cost : 0;
+        rows += `<tr><td style="padding:6px 10px 6px 22px;color:#555;font-size:.84em">↳ ${v}</td>
+          <td style="text-align:right;padding:6px 10px;color:${stV>0?'#16a34a':stV<0?'#dc2626':'#999'}">${fmtCant(stV)}${u?' '+u:''}</td>
+          <td style="text-align:right;padding:6px 10px">${cost>0?fmt(cost):'—'}</td>
+          <td style="text-align:right;padding:6px 10px;font-weight:600;color:${val>0?'#2563eb':'#999'}">${val>0?fmt(val):'—'}</td></tr>`;
+      });
+    } else {
+      const st   = stockActual(p);
+      const cost = DB.costosInv[p] || 0;
+      const val  = st > 0 && cost > 0 ? st * cost : 0;
+      rows += `<tr><td style="padding:7px 10px;font-weight:600">${p}</td>
+        <td style="text-align:right;padding:7px 10px;font-weight:700;color:${st>0?'#16a34a':st<0?'#dc2626':'#999'}">${fmtCant(st)}${u?' '+u:''}</td>
+        <td style="text-align:right;padding:7px 10px">${cost>0?fmt(cost):'—'}</td>
+        <td style="text-align:right;padding:7px 10px;font-weight:600;color:${val>0?'#2563eb':'#999'}">${val>0?fmt(val):'—'}</td></tr>`;
+    }
+  });
+
+  const topProds = DB.productos.map(p=>({p,st:Math.max(0,stockActual(p))})).filter(x=>x.st>0).sort((a,b)=>b.st-a.st).slice(0,8);
+  const maxSt = Math.max(1,...topProds.map(x=>x.st));
+  const BH=90,BW=32,GAP=14;
+  const svgW = topProds.length*(BW+GAP);
+  const bars = topProds.map((x,i)=>{
+    const h=Math.round(x.st/maxSt*BH);
+    const lbl=x.p.length>7?x.p.slice(0,6)+'…':x.p;
+    return `<g transform="translate(${i*(BW+GAP)},0)">
+      <rect x="0" y="${BH-h}" width="${BW}" height="${h}" rx="5" fill="#2563eb" opacity=".82"/>
+      <text x="${BW/2}" y="${BH+14}" text-anchor="middle" font-size="9" fill="#555">${lbl}</text>
+      <text x="${BW/2}" y="${BH-h-5}" text-anchor="middle" font-size="9.5" fill="#2563eb" font-weight="700">${fmtCant(x.st)}</text>
+    </g>`;
+  }).join('');
+
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Inventario ${negocio}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}
+  h1{font-size:1.4em;margin-bottom:3px}
+  .sub{font-size:.8em;color:#888;margin-bottom:22px}
+  .stats{display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+  .sb{border:1px solid #e5e7eb;border-radius:10px;padding:11px 16px;min-width:120px}
+  .sb .v{font-size:1.3em;font-weight:700;color:#2563eb}
+  .sb .l{font-size:.73em;color:#888;margin-top:2px}
+  .chart{margin-bottom:24px}
+  .ct{font-size:.73em;text-transform:uppercase;letter-spacing:.07em;color:#888;margin-bottom:10px;font-weight:700}
+  table{width:100%;border-collapse:collapse;font-size:.84em;margin-bottom:24px}
+  th{background:#f1f5f9;text-align:left;padding:9px 10px;font-size:.73em;text-transform:uppercase;letter-spacing:.06em;color:#555;border-bottom:2px solid #e5e7eb}
+  th:not(:first-child){text-align:right}
+  tr{border-bottom:1px solid #f1f5f9}
+  .tf td{border-top:2px solid #e5e7eb;font-weight:700;padding:10px;font-size:.96em}
+  footer{margin-top:24px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:.72em;color:#aaa;text-align:center}
+  @media print{@page{margin:18mm}}</style></head><body>
+  <h1>📦 ${esc(negocio)} — Inventario</h1>
+  <div class="sub">${fecha} · ${hora}</div>
+  <div class="stats">
+    <div class="sb"><div class="v">${DB.productos.filter(p=>stockActual(p)>0).length}</div><div class="l">Con stock</div></div>
+    <div class="sb"><div class="v">${fmt(valTotal)}</div><div class="l">Valor total (costo)</div></div>
+    <div class="sb"><div class="v">${(DB.entradas||[]).length}</div><div class="l">Entradas</div></div>
+  </div>
+  ${topProds.length?`<div class="chart"><div class="ct">Stock por producto</div>
+    <svg width="${Math.max(svgW,180)}" height="${BH+28}" xmlns="http://www.w3.org/2000/svg">${bars}</svg></div>`:''}
+  <table><thead><tr><th>Producto / Variante</th><th>Stock</th><th>Costo unitario</th><th>Valor (costo)</th></tr></thead>
+  <tbody>${rows}
+  <tr class="tf"><td colspan="3" style="text-align:right">TOTAL INVENTARIO (COSTO)</td>
+    <td style="text-align:right;color:#2563eb">${fmt(valTotal)}</td></tr>
+  </tbody></table>
+  <footer>${esc(negocio)} · Generado el ${fecha} a las ${hora}</footer>
+  <script>setTimeout(()=>window.print(),700)<\/script>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { toast('Permite ventanas emergentes para generar PDF', true); return; }
+  win.document.write(html);
+  win.document.close();
 }
 
 function renderInventario() {
   if (!DB.entradas)  DB.entradas  = [];
-  if (!DB.precios)   DB.precios   = {};
-  const prodsConStock = DB.productos.filter(p=>stockActual(p)>0).length;
-  const valorTotal    = DB.productos.reduce((s,p)=>{const st=stockActual(p);return st>0?s+st*(+DB.precios[p]||0):s;},0);
-  const prodRows = DB.productos.map(p=>{
-    const st=stockActual(p), u=DB.unidades[p]||'';
-    const col=st>0?'var(--green)':st<0?'var(--red)':'var(--muted)';
-    return `<div class="prod-cat-item">
-      <span style="flex:1">${esc(p)}${u?` <span class="unit-tag">${esc(u)}</span>`:''}</span>
-      <span style="font-weight:700;color:${col};min-width:60px;text-align:right">${fmtCant(st)}${u?' '+esc(u):''}</span>
-      <button class="btn-sm" style="background:var(--gdim);color:var(--green);border:1px solid rgba(63,185,80,.3);margin-left:9px" onclick="abrirEntrada('${esc(p)}')">＋</button>
+  if (!DB.variantes) DB.variantes = {};
+  if (!DB.costosInv) DB.costosInv = {};
+
+  const prodsConStock = DB.productos.filter(p => stockActual(p) > 0).length;
+  const valTotal      = valorTotalInventario();
+  const maxStock      = Math.max(1, ...DB.productos.map(p => stockActual(p)));
+
+  const prodRows = DB.productos.map(p => {
+    const u       = DB.unidades[p] || '';
+    const stTotal = stockActual(p);
+    const vars    = DB.variantes[p] || [];
+    const col     = stTotal > 0 ? 'var(--green)' : stTotal < 0 ? 'var(--red)' : 'var(--muted)';
+    const barPct  = Math.min(100, Math.round(Math.max(0, stTotal) / maxStock * 100));
+
+    const varRows = vars.map(v => {
+      const stV  = stockActual(p, v);
+      const key  = p+'|'+v;
+      const cost = DB.costosInv[key] || DB.costosInv[p] || 0;
+      const val  = stV > 0 && cost > 0 ? stV * cost : 0;
+      const colV = stV > 0 ? 'var(--green)' : stV < 0 ? 'var(--red)' : 'var(--muted)';
+      return `<div style="display:flex;align-items:center;gap:7px;padding:5px 0 5px 10px;border-top:1px solid var(--border);font-size:.81em">
+        <span style="flex:1;color:var(--muted)">↳ ${esc(v)}</span>
+        <span style="color:${colV};font-weight:600;min-width:46px;text-align:right">${fmtCant(stV)}${u?' '+esc(u):''}</span>
+        <span style="color:var(--muted);min-width:58px;text-align:right">${cost>0?fmt(cost):'—'}</span>
+        <span style="color:var(--accent);font-weight:700;min-width:66px;text-align:right">${val>0?fmt(val):'—'}</span>
+        <button class="btn-sm" style="background:var(--gdim);color:var(--green);border:1px solid rgba(63,185,80,.3);flex-shrink:0" onclick="abrirEntrada('${esc(p)}','${esc(v)}')">＋</button>
+      </div>`;
+    }).join('');
+
+    const cost = DB.costosInv[p] || 0;
+    const pVal = stTotal > 0 && cost > 0 && !vars.length ? fmt(stTotal * cost) : '';
+
+    return `<div style="padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="flex:1;font-weight:600;font-size:.9em">${esc(p)}${u?` <span class="unit-tag">${esc(u)}</span>`:''}</span>
+        <span style="font-weight:700;color:${col};min-width:54px;text-align:right">${fmtCant(stTotal)}${u?' '+esc(u):''}</span>
+        ${!vars.length&&cost>0?`<span style="font-size:.78em;color:var(--muted);min-width:54px;text-align:right">${fmt(cost)}</span>`:'<span style="min-width:54px"></span>'}
+        ${pVal?`<span style="font-size:.8em;color:var(--accent);font-weight:700;min-width:64px;text-align:right">${pVal}</span>`:'<span style="min-width:64px"></span>'}
+        <button class="btn-sm" style="background:var(--gdim);color:var(--green);border:1px solid rgba(63,185,80,.3);flex-shrink:0" onclick="abrirEntrada('${esc(p)}')">＋</button>
+      </div>
+      ${barPct>0?`<div class="bar-wrap" style="margin-top:4px"><div class="bar-fill" style="width:${barPct}%"></div></div>`:''}
+      ${varRows}
     </div>`;
   }).join('');
-  const ultimas=[...(DB.entradas)].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,10);
-  const entradasHTML=ultimas.length?ultimas.map(e=>{
-    const u=DB.unidades[e.prod]||'';
+
+  const ultimas = [...DB.entradas].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,10);
+  const entradasHTML = ultimas.length ? ultimas.map(e => {
+    const u = DB.unidades[e.prod] || '';
+    const cu = e.costoUnit || (e.costo && e.cant ? e.costo/e.cant : 0);
     return `<div class="prod-cat-item">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:.88em">${esc(e.prod)}</div>
-        <div style="font-size:.74em;color:var(--muted)">${fmtFecha(e.fecha)}${e.costo>0?' · '+fmt(e.costo):''}${e.nota?' · '+esc(e.nota):''}</div>
+        <div style="font-weight:600;font-size:.88em">${esc(e.prod)}${e.variante?` <span class="unit-tag">${esc(e.variante)}</span>`:''}</div>
+        <div style="font-size:.74em;color:var(--muted)">${fmtFecha(e.fecha)}${cu>0?' · '+fmt(cu)+'/u':''}${e.nota?' · '+esc(e.nota):''}</div>
       </div>
       <span class="tag" style="margin-right:8px">+${fmtCant(e.cant)}${u?' '+esc(u):''}</span>
       <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="borrarEntrada('${esc(e.id)}')">✕</button>
     </div>`;
-  }).join(''):'<div class="empty"><div class="empty-ico">📦</div>Sin entradas registradas</div>';
+  }).join('') : '<div class="empty"><div class="empty-ico">📦</div>Sin entradas registradas</div>';
+
   return `
     <div class="section-title">📦 Inventario</div>
     <div class="stats">
       <div class="stat green"><div class="stat-val">${prodsConStock}</div><div class="stat-lbl">Con stock</div></div>
-      <div class="stat accent"><div class="stat-val">${fmt(valorTotal)}</div><div class="stat-lbl">Valor en stock</div></div>
+      <div class="stat accent"><div class="stat-val">${fmt(valTotal)}</div><div class="stat-lbl">Valor (costo)</div></div>
     </div>
+    <button class="btn btn-surface" style="width:100%;margin-bottom:12px;font-size:.86em" onclick="generarPDFInventario()">📄 Exportar PDF del inventario</button>
     <div class="card">
-      <div class="card-title">Stock por producto</div>
-      ${prodRows||'<div style="color:var(--muted);font-size:.84em">Sin productos en catálogo</div>'}
+      <div style="display:flex;justify-content:space-between;font-size:.7em;color:var(--muted);padding:0 0 7px;border-bottom:1px solid var(--border);font-weight:700;letter-spacing:.05em;text-transform:uppercase">
+        <span style="flex:1">Producto</span>
+        <span style="min-width:54px;text-align:right">Stock</span>
+        <span style="min-width:54px;text-align:right">Costo</span>
+        <span style="min-width:64px;text-align:right">Valor</span>
+        <span style="min-width:30px"></span>
+      </div>
+      ${prodRows||'<div style="color:var(--muted);font-size:.84em;padding:12px 0">Sin productos en catálogo</div>'}
     </div>
     <div class="card"><div class="card-title">Últimas entradas</div>${entradasHTML}</div>`;
 }
 
-let entradaForm = { prod:'', cant:'', costo:'', nota:'' };
+let entradaForm = { prod:'', variante:'', cant:'', costoUnit:'', nota:'' };
 
-function abrirEntrada(prod) {
-  entradaForm = { prod, cant:'', costo:String((DB.precios&&DB.precios[prod])||''), nota:'' };
+function abrirEntrada(prod, variante) {
+  if (!DB.variantes) DB.variantes = {};
+  if (!DB.costosInv) DB.costosInv = {};
+  const key = variante ? prod+'|'+variante : prod;
+  entradaForm = {
+    prod,
+    variante: variante || '',
+    cant: '',
+    costoUnit: String(DB.costosInv[key] || DB.costosInv[prod] || ''),
+    nota: ''
+  };
   pintarEntradaForm();
   openModal('m-entrada');
 }
@@ -3278,34 +3659,62 @@ function abrirEntrada(prod) {
 function pintarEntradaForm() {
   const el = document.getElementById('m-entrada-body');
   if (!el) return;
-  const u = DB.unidades[entradaForm.prod]||'';
+  const u    = DB.unidades[entradaForm.prod] || '';
+  const vars = ((DB.variantes||{})[entradaForm.prod] || []);
+  const varOpts = vars.map(v => `<option value="${esc(v)}">`).join('');
+  const cant    = +entradaForm.cant    || 0;
+  const cunit   = +entradaForm.costoUnit || 0;
   el.innerHTML = `
     <div style="font-weight:700;font-size:1em;margin-bottom:12px">${esc(entradaForm.prod)}${u?' <span class="unit-tag">'+esc(u)+'</span>':''}</div>
+    <label class="input-label">Variante / Marca (opcional)</label>
+    <input type="text" list="varlist-e" id="inp-ent-var" placeholder="Ej: Frankfurt Zenú 500g, Americana..."
+      value="${esc(entradaForm.variante)}" oninput="entradaForm.variante=this.value" style="margin-bottom:9px">
+    <datalist id="varlist-e">${varOpts}</datalist>
     <div class="range-row">
       <div>
         <label class="input-label">Cantidad${u?' ('+esc(u)+')':''}</label>
         <input type="number" inputmode="decimal" min="0" step="0.001" id="inp-ent-cant"
-          placeholder="0" value="${esc(String(entradaForm.cant))}" oninput="entradaForm.cant=this.value">
+          placeholder="0" value="${esc(String(entradaForm.cant))}" oninput="entradaForm.cant=this.value;pintarEntradaForm()">
       </div>
       <div>
-        <label class="input-label">Costo total</label>
+        <label class="input-label">Costo unitario</label>
         <input type="number" inputmode="decimal" min="0" id="inp-ent-costo"
-          placeholder="0" value="${esc(String(entradaForm.costo))}" oninput="entradaForm.costo=this.value">
+          placeholder="0" value="${esc(String(entradaForm.costoUnit))}" oninput="entradaForm.costoUnit=this.value;pintarEntradaForm()">
       </div>
     </div>
+    ${cant>0&&cunit>0?`<div style="text-align:right;font-size:.82em;color:var(--accent);margin-bottom:9px;font-weight:700">
+      Total entrada: ${fmt(cant*cunit)}</div>`:''}
     <label class="input-label">Nota (opcional)</label>
-    <input type="text" placeholder="Proveedor, lote..." value="${esc(entradaForm.nota)}"
+    <input type="text" placeholder="Proveedor, lote, vencimiento..." value="${esc(entradaForm.nota)}"
       style="margin-bottom:12px" oninput="entradaForm.nota=this.value">
     <button class="btn btn-green" onclick="guardarEntrada()">✅ Registrar entrada</button>`;
 }
 
 function guardarEntrada() {
-  const cant=+entradaForm.cant;
-  if(!cant||cant<=0){toast('Ingresa una cantidad válida',true);return;}
-  if(!DB.entradas)DB.entradas=[];
-  DB.entradas.unshift({id:uid(),fecha:hoy(),ts:Date.now(),prod:entradaForm.prod,cant,costo:+entradaForm.costo||0,nota:entradaForm.nota.trim()});
-  guardar(); closeModal('m-entrada'); toast('📦 Entrada registrada');
-  if(paginaActual==='inventario')render();
+  const cant = +entradaForm.cant;
+  if (!cant || cant <= 0) { toast('Ingresa una cantidad válida', true); return; }
+  if (!DB.entradas) DB.entradas = [];
+  if (!DB.variantes) DB.variantes = {};
+  if (!DB.costosInv) DB.costosInv = {};
+  const variante  = entradaForm.variante.trim();
+  const costoUnit = +entradaForm.costoUnit || 0;
+  DB.entradas.unshift({
+    id: uid(), fecha: hoy(), ts: Date.now(),
+    prod: entradaForm.prod, cant, variante,
+    costoUnit, costo: Math.round(costoUnit * cant),
+    nota: entradaForm.nota.trim()
+  });
+  if (variante) {
+    if (!DB.variantes[entradaForm.prod]) DB.variantes[entradaForm.prod] = [];
+    if (!DB.variantes[entradaForm.prod].includes(variante)) DB.variantes[entradaForm.prod].push(variante);
+  }
+  if (costoUnit > 0) {
+    const key = variante ? entradaForm.prod+'|'+variante : entradaForm.prod;
+    DB.costosInv[key] = costoUnit;
+  }
+  guardar(); closeModal('m-entrada');
+  toast('📦 Entrada registrada' + (costoUnit>0?' · '+fmt(costoUnit)+'/u':''));
+  if (paginaActual === 'inventario') render();
 }
 
 function borrarEntrada(id) {
