@@ -1475,11 +1475,23 @@ function guardarVenta() {
 
   const venta = { id:uid(), fecha:hoy(), ts:Date.now(), cliente, nota, items, total,
                   pago:vF.pago, numRecibo, fiadoPagado:false,
+                  cantsPagadas:{},
                   itemsPagados: vF.pago === 'fiado' ? [] : items.map((_,i) => i) };
 
   DB.ventas.unshift(venta);
-  if (cliente!=='Sin nombre' && !DB.clientes.includes(cliente)) DB.clientes.push(cliente);
-  items.forEach(it => { if (!DB.productos.includes(it.prod)) DB.productos.push(it.prod); });
+
+  // ── Automatización: registrar cliente, catálogo y precios en un solo paso ──
+  if (cliente !== 'Sin nombre' && !getClienteObj(cliente)) {
+    if (!DB.clientes) DB.clientes = [];
+    DB.clientes.push({ id:uid(), nombre:cliente, tel:'', ubicacion:null, notas:'' });
+  }
+  if (!DB.precios) DB.precios = {};
+  items.forEach(it => {
+    if (!DB.productos.includes(it.prod)) DB.productos.push(it.prod);
+    // El precio de venta se convierte en el predeterminado para la próxima vez
+    DB.precios[it.prod] = it.precio;
+  });
+
   guardar();
   vibrar();
 
@@ -3151,12 +3163,13 @@ function quitarProd(i) {
 function addCli() {
   const inp=document.getElementById('inp-cli'); if(!inp) return;
   const n=inp.value.trim(); if(!n){toast('Escribe un nombre',true);return;}
-  if(DB.clientes.includes(n)){toast('Ya existe',true);inp.value='';return;}
-  DB.clientes.push(n); guardar(); inp.value='';
+  if(getClienteObj(n)){toast('Ya existe',true);inp.value='';return;}
+  if(!DB.clientes) DB.clientes=[];
+  DB.clientes.push({id:uid(),nombre:n,tel:'',ubicacion:null,notas:''}); guardar(); inp.value='';
   const el=document.getElementById('cli-cat');
   if(el) el.innerHTML=DB.clientes.map((c,i)=>`
     <div class="prod-cat-item">
-      <span>👤 ${esc(c)}</span>
+      <span>👤 ${esc(clienteNombre(c))}</span>
       <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="quitarCli(${i})">✕</button>
     </div>`).join('');
   toast('Cliente guardado');
