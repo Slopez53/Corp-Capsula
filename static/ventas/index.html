@@ -580,11 +580,14 @@ body.offline .offline-badge{display:inline}
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('documentos')">
         <span class="mas-ico">📷</span><span class="mas-lbl">Documentos</span>
       </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('cotizaciones')">
+        <span class="mas-ico">📄</span><span class="mas-lbl">Cotizaciones</span>
+      </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('movimientos')">
+        <span class="mas-ico">💰</span><span class="mas-lbl">Caja</span>
+      </button>
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('ajustes')">
         <span class="mas-ico">⚙️</span><span class="mas-lbl">Ajustes</span>
-      </button>
-      <button class="mas-btn" onclick="closeModal('m-mas');abrirGasto()">
-        <span class="mas-ico">💸</span><span class="mas-lbl">Gasto</span>
       </button>
     </div>
   </div>
@@ -679,6 +682,18 @@ body.offline .offline-badge{display:inline}
       <option value="otro">Otro</option>
     </select>
     <button class="btn btn-primary" onclick="guardarGasto()">Guardar Gasto</button>
+  </div>
+</div>
+
+<!-- Modal: ingreso extra -->
+<div class="modal-bg" id="m-ingreso" onclick="bgClose(event,'m-ingreso')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-ingreso')">✕</button>
+    <div class="modal-title">💵 Ingreso Extra</div>
+    <input type="text" id="ingreso-desc" placeholder="Descripción (ej: préstamo, otro ingreso)" autocomplete="off" style="margin-bottom:10px">
+    <input type="number" id="ingreso-monto" placeholder="Monto" inputmode="decimal" style="margin-bottom:16px">
+    <button class="btn btn-primary" onclick="guardarIngreso()">Guardar Ingreso</button>
   </div>
 </div>
 
@@ -897,6 +912,9 @@ let DB = {
   compras:    [],
   variantes:  {},
   costosInv:  {},
+  gastos:       [],
+  ingresos:     [],
+  cotizaciones: [],
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -975,6 +993,9 @@ function cargar() {
     DB.compras    = Array.isArray(p.compras)     ? p.compras     : [];
     DB.variantes  = (p.variantes  && typeof p.variantes==='object')  ? p.variantes  : {};
     DB.costosInv  = (p.costosInv  && typeof p.costosInv==='object')  ? p.costosInv  : {};
+    DB.gastos       = Array.isArray(p.gastos)       ? p.gastos       : [];
+    DB.ingresos     = Array.isArray(p.ingresos)     ? p.ingresos     : [];
+    DB.cotizaciones = Array.isArray(p.cotizaciones) ? p.cotizaciones : [];
     DB.config    = { ...DB.config, ...(p.config||{}) };
     DB.ventas.forEach((v,i) => {
       if (!v.numRecibo) v.numRecibo = i+1;
@@ -1139,7 +1160,7 @@ function mesPasado()  {
 // ═══════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════
-const MAS_PAGES = ['clientes','devol','ajustes','inventario','documentos','productos','compras'];
+const MAS_PAGES = ['clientes','devol','ajustes','inventario','documentos','productos','compras','cotizaciones','movimientos'];
 
 function goTo(p, pushHistory=true) {
   leerFormVenta();
@@ -1231,7 +1252,11 @@ function htmlFilas() {
     const esPeso = unidad === 'lb' || unidad === 'kg' || unidad === 'gr';
     const cantPlaceholder = unidad ? (esPeso ? unidad : 'Cant') : 'Cant';
 
-    const campo = it.custom
+    const campo = it.servicio
+      ? `<input type="text" placeholder="🔧 Nombre del servicio" value="${esc(it.prod)}"
+           style="padding:8px 7px;font-size:.86em;border-color:var(--accent2)"
+           oninput="vF.items[${i}].prod=this.value">`
+      : it.custom
       ? `<input type="text" placeholder="Nombre producto" value="${esc(it.prod)}"
            style="padding:8px 7px;font-size:.86em"
            oninput="vF.items[${i}].prod=this.value">`
@@ -1311,6 +1336,14 @@ function agregarFila() {
   refrescarFilas();
   const rows = document.querySelectorAll('#prod-rows .prod-row');
   rows[rows.length-1]?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function agregarServicio() {
+  vF.items.push({ prod:'', cant:1, precio:'', custom:true, servicio:true });
+  refrescarFilas();
+  const rows = document.querySelectorAll('#prod-rows .prod-row');
+  rows[rows.length-1]?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  rows[rows.length-1]?.querySelector('input')?.focus();
 }
 
 function quitarFila(i) {
@@ -1404,11 +1437,16 @@ function renderVenta() {
     </div>
 
     <div class="card">
-      <div class="card-title">Productos vendidos</div>
+      <div class="card-title">Productos y servicios</div>
       <div id="prod-rows">${htmlFilas()}</div>
-      <button class="btn btn-surface" style="margin-top:7px;font-size:.88em" onclick="agregarFila()">
-        ＋ Agregar producto
-      </button>
+      <div style="display:flex;gap:7px;margin-top:7px">
+        <button class="btn btn-surface" style="flex:1;font-size:.86em" onclick="agregarFila()">
+          ＋ Producto
+        </button>
+        <button class="btn btn-surface" style="flex:1;font-size:.86em;color:var(--accent2)" onclick="agregarServicio()">
+          🔧 Servicio
+        </button>
+      </div>
     </div>
 
     <div class="card">
@@ -1434,9 +1472,13 @@ function renderVenta() {
     </div>
 
     <button class="btn btn-green" onclick="guardarVenta()">✅ Guardar Venta</button>
-    ${hayDatos ? `
-      <button class="btn btn-surface" style="margin-top:7px;font-size:.86em;color:var(--muted)"
-        onclick="limpiarForm()">🗑️ Limpiar formulario</button>` : ''}
+    <div style="display:flex;gap:7px;margin-top:7px">
+      <button class="btn btn-surface" style="flex:1;font-size:.84em;color:var(--accent)"
+        onclick="guardarCotizacion()">📄 Cotización</button>
+      ${hayDatos ? `
+      <button class="btn btn-surface" style="flex:1;font-size:.84em;color:var(--muted)"
+        onclick="limpiarForm()">🗑️ Limpiar</button>` : ''}
+    </div>
   `;
 }
 
@@ -1466,7 +1508,12 @@ function guardarVenta() {
 
   const items = vF.items
     .filter(it => it.prod?.trim() && +it.precio > 0 && +it.cant > 0)
-    .map(it => ({ prod:it.prod.trim(), cant:Math.round((+it.cant)*1000)/1000, precio:Math.round(+it.precio) }));
+    .map(it => {
+      const o = { prod:it.prod.trim(), cant:Math.round((+it.cant)*1000)/1000, precio:Math.round(+it.precio) };
+      if (it.servicio) o.servicio = true;
+      if (it.variante) o.variante = it.variante;
+      return o;
+    });
 
   if (!items.length) { toast('Agrega producto, cantidad y precio mayor a 0', true); return; }
 
@@ -1487,6 +1534,7 @@ function guardarVenta() {
   }
   if (!DB.precios) DB.precios = {};
   items.forEach(it => {
+    if (it.servicio) return; // los servicios no van al catálogo ni afectan inventario
     if (!DB.productos.includes(it.prod)) DB.productos.push(it.prod);
     // El precio de venta se convierte en el predeterminado para la próxima vez
     DB.precios[it.prod] = it.precio;
@@ -1513,7 +1561,8 @@ function renderHoy() {
   const totalFiado = fiados.reduce((s,v)=>s+montoPendienteV(v),0);
   const gastosHoy  = (DB.gastos||[]).filter(g=>(g.fecha||'').slice(0,10)===hoy());
   const totalGastos= gastosHoy.reduce((s,g)=>s+(+g.monto||0),0);
-  const balance    = cobradoHoy - totalGastos;
+  const ingresosHoy= (DB.ingresos||[]).filter(g=>(g.fecha||'').slice(0,10)===hoy()).reduce((s,g)=>s+(+g.monto||0),0);
+  const balance    = cobradoHoy + ingresosHoy - totalGastos;
   const cliSet     = new Set(ventasHoy.map(v=>v.cliente).filter(Boolean));
 
   const prods = {};
@@ -4751,7 +4800,7 @@ function busquedaGlobal(q) {
     act:() => { closeModal('m-busqueda'); ventaSelId = v.id; goTo('ventas'); }
   }));
   // Clientes
-  (DB.clientes||[]).filter(c => c.toLowerCase().includes(q)).slice(0,4).forEach(c => _busqRes.push({
+  (DB.clientes||[]).map(clienteNombre).filter(c => c && c.toLowerCase().includes(q)).slice(0,4).forEach(c => _busqRes.push({
     tipo:'👤 Cliente', sub:c,
     act:() => { closeModal('m-busqueda'); verCliente(c); }
   }));
@@ -4908,10 +4957,170 @@ function guardarGasto() {
   const cat   = document.getElementById('gasto-cat').value;
   if (!desc || !monto || monto <= 0) { toast('Completa descripción y monto', true); return; }
   if (!DB.gastos) DB.gastos = [];
-  DB.gastos.push({ id: Date.now().toString(36), fecha: new Date().toISOString(), desc, monto, cat });
+  DB.gastos.unshift({ id: uid(), fecha: hoy(), ts: Date.now(), desc, monto, cat });
   guardar(); vibrar();
   closeModal('m-gasto');
   toast('💸 Gasto guardado · ' + fmt(monto));
+  if (paginaActual === 'movimientos' || paginaActual === 'hoy') render();
+}
+
+// Quick extra income (ingreso) — completes the daily cash balance
+function abrirIngreso() {
+  document.getElementById('ingreso-desc').value = '';
+  document.getElementById('ingreso-monto').value = '';
+  openModal('m-ingreso');
+  setTimeout(()=>document.getElementById('ingreso-desc')?.focus(), 150);
+}
+
+function guardarIngreso() {
+  const desc  = document.getElementById('ingreso-desc').value.trim();
+  const monto = parseFloat(document.getElementById('ingreso-monto').value);
+  if (!desc || !monto || monto <= 0) { toast('Completa descripción y monto', true); return; }
+  if (!DB.ingresos) DB.ingresos = [];
+  DB.ingresos.unshift({ id: uid(), fecha: hoy(), ts: Date.now(), desc, monto });
+  guardar(); vibrar();
+  closeModal('m-ingreso');
+  toast('💵 Ingreso guardado · ' + fmt(monto));
+  if (paginaActual === 'movimientos' || paginaActual === 'hoy') render();
+}
+
+function borrarMovimiento(tipo, id) {
+  if (tipo === 'gasto')   DB.gastos   = (DB.gastos||[]).filter(g => g.id !== id);
+  if (tipo === 'ingreso') DB.ingresos = (DB.ingresos||[]).filter(g => g.id !== id);
+  guardar(); toast('Movimiento eliminado', true);
+  if (paginaActual === 'movimientos') render();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CAJA / MOVIMIENTOS (ingresos extra + gastos)
+// ═══════════════════════════════════════════════════════════
+function renderMovimientos() {
+  const gastos   = (DB.gastos||[]).map(g => ({...g, _t:'gasto'}));
+  const ingresos = (DB.ingresos||[]).map(g => ({...g, _t:'ingreso'}));
+  const hoyStr   = hoy();
+  const gHoy = gastos.filter(g => (g.fecha||'').slice(0,10) === hoyStr).reduce((s,g)=>s+(+g.monto||0),0);
+  const iHoy = ingresos.filter(g => (g.fecha||'').slice(0,10) === hoyStr).reduce((s,g)=>s+(+g.monto||0),0);
+  const todos = [...gastos, ...ingresos].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60);
+
+  const lista = todos.length ? todos.map(m => {
+    const esG = m._t === 'gasto';
+    return `<div class="prod-cat-item">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.88em">${esG?'💸':'💵'} ${esc(m.desc)}${m.cat?` <span class="tag">${esc(m.cat)}</span>`:''}</div>
+        <div style="font-size:.74em;color:var(--muted)">${fmtFecha((m.fecha||'').slice(0,10))}</div>
+      </div>
+      <span style="font-weight:700;color:${esG?'var(--red)':'var(--green)'};margin-right:8px">${esG?'−':'+'}${fmt(m.monto)}</span>
+      <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="borrarMovimiento('${m._t}','${esc(m.id)}')">✕</button>
+    </div>`;
+  }).join('') : '<div class="empty"><div class="empty-ico">💰</div>Sin movimientos registrados</div>';
+
+  return `
+    <button class="back-btn" onclick="history.back()">← Volver</button>
+    <div class="section-title">💰 Caja del día</div>
+    <div class="stats">
+      <div class="stat green"><div class="stat-val">${fmt(iHoy)}</div><div class="stat-lbl">Ingresos extra hoy</div></div>
+      <div class="stat" style="background:var(--rdim);border-color:rgba(248,81,73,.3)"><div class="stat-val" style="color:var(--red)">${fmt(gHoy)}</div><div class="stat-lbl">Gastos hoy</div></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-bottom:12px">
+      <button class="btn btn-green" style="flex:1" onclick="abrirIngreso()">💵 Ingreso extra</button>
+      <button class="btn btn-red" style="flex:1" onclick="abrirGasto()">💸 Gasto</button>
+    </div>
+    <div class="card"><div class="card-title">Historial reciente</div>${lista}</div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// COTIZACIONES
+// ═══════════════════════════════════════════════════════════
+function guardarCotizacion() {
+  leerFormVenta();
+  const items = vF.items
+    .filter(it => it.prod?.trim() && +it.precio > 0 && +it.cant > 0)
+    .map(it => {
+      const o = { prod:it.prod.trim(), cant:Math.round((+it.cant)*1000)/1000, precio:Math.round(+it.precio) };
+      if (it.servicio) o.servicio = true;
+      return o;
+    });
+  if (!items.length) { toast('Agrega producto, cantidad y precio para cotizar', true); return; }
+  const total = items.reduce((s,it)=>s+it.cant*it.precio, 0);
+  if (!DB.cotizaciones) DB.cotizaciones = [];
+  DB.cotizaciones.unshift({
+    id: uid(), fecha: hoy(), ts: Date.now(),
+    cliente: vF.cliente.trim() || 'Sin nombre',
+    nota: vF.nota.trim(), items, total
+  });
+  guardar(); vibrar();
+  vF = { cliente:'', nota:'', pago:DB.config.defaultPago||'efectivo', items:[{prod:'',cant:1,precio:'',custom:false}] };
+  toast('📄 Cotización guardada · ' + fmt(total));
+  goTo('cotizaciones');
+}
+
+function renderCotizaciones() {
+  const cots = [...(DB.cotizaciones||[])].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const lista = cots.length ? cots.map(c => {
+    const resumen = (c.items||[]).map(it=>`${esc(it.prod)} ×${fmtCant(it.cant)}`).join(', ');
+    return `<div class="venta-item" style="border-left-color:var(--accent2)">
+      <div class="venta-top">
+        <span class="venta-cliente">📄 ${esc(c.cliente)}</span>
+        <span class="venta-total" style="color:var(--accent2)">${fmt(c.total)}</span>
+      </div>
+      <div class="venta-meta">${fmtFecha(c.fecha)} · ${fmtHora(c.ts)}</div>
+      <div class="venta-prods">${resumen}</div>
+      <div style="display:flex;gap:6px;margin-top:9px">
+        <button class="btn-sm btn-green" style="flex:1" onclick="convertirCotizacion('${esc(c.id)}')">✅ Convertir en venta</button>
+        <button class="btn-sm" style="background:var(--adim);color:var(--accent)" onclick="compartirCotizacion('${esc(c.id)}')">📤</button>
+        <button class="btn-sm" style="background:var(--rdim);color:var(--red)" onclick="borrarCotizacion('${esc(c.id)}')">✕</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty"><div class="empty-ico">📄</div>Sin cotizaciones<br><span style="font-size:.84em">Crea una desde el formulario de venta</span></div>';
+
+  return `
+    <button class="back-btn" onclick="history.back()">← Volver</button>
+    <div class="section-title">📄 Cotizaciones ${cots.length?`<span class="badge">${cots.length}</span>`:''}</div>
+    <div style="background:var(--adim);border:1px solid rgba(68,147,248,.2);border-radius:var(--radius);padding:10px 13px;margin-bottom:11px;font-size:.82em;color:var(--muted)">
+      💡 Crea una cotización desde <b style="color:var(--text)">Nueva venta → 📄 Cotización</b>. Cuando el cliente acepte, conviértela en venta con un toque.
+    </div>
+    ${lista}`;
+}
+
+function convertirCotizacion(id) {
+  const c = (DB.cotizaciones||[]).find(x=>x.id===id);
+  if (!c) return;
+  vF = {
+    cliente: c.cliente === 'Sin nombre' ? '' : c.cliente,
+    nota: c.nota || '',
+    pago: DB.config.defaultPago || 'efectivo',
+    items: (c.items||[]).map(it => ({ prod:it.prod, cant:it.cant, precio:it.precio, custom:!!it.servicio, servicio:!!it.servicio }))
+  };
+  DB.cotizaciones = DB.cotizaciones.filter(x=>x.id!==id);
+  guardar();
+  goTo('venta');
+  toast('✅ Cotización cargada · revisa y guarda la venta');
+}
+
+function compartirCotizacion(id) {
+  const c = (DB.cotizaciones||[]).find(x=>x.id===id);
+  if (!c) return;
+  const neg = DB.config.negocio || 'Mi Negocio';
+  let txt = `📄 COTIZACIÓN · ${neg}\n`;
+  txt += `Cliente: ${c.cliente}\nFecha: ${fmtFecha(c.fecha)}\n\n`;
+  (c.items||[]).forEach(it => {
+    txt += `• ${it.prod} ×${fmtCant(it.cant)} — ${fmt(it.cant*it.precio)}\n`;
+  });
+  txt += `\nTOTAL: ${fmt(c.total)}`;
+  if (c.nota) txt += `\n\nNota: ${c.nota}`;
+  txt += `\n\n(Precios sujetos a cambio)`;
+  if (navigator.share) {
+    navigator.share({ text: txt }).catch(()=>{});
+  } else {
+    window.open('https://wa.me/?text='+encodeURIComponent(txt), '_blank');
+  }
+}
+
+function borrarCotizacion(id) {
+  if (!confirm('¿Eliminar esta cotización?')) return;
+  DB.cotizaciones = (DB.cotizaciones||[]).filter(x=>x.id!==id);
+  guardar(); toast('Cotización eliminada', true);
+  if (paginaActual === 'cotizaciones') render();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4933,9 +5142,11 @@ function render() {
   else if (paginaActual==='documentos')  app.innerHTML = renderDocumentos();
   else if (paginaActual==='productos')   app.innerHTML = renderProductos();
   else if (paginaActual==='compras')     app.innerHTML = renderCompras();
+  else if (paginaActual==='cotizaciones')app.innerHTML = renderCotizaciones();
+  else if (paginaActual==='movimientos') app.innerHTML = renderMovimientos();
   actualizarHeaderTotal();
   const fab = document.getElementById('calc-fab');
-  if (fab) fab.style.display = ['ajustes','inventario','documentos','clientes','productos','compras'].includes(paginaActual) ? 'none' : 'flex';
+  if (fab) fab.style.display = ['ajustes','inventario','documentos','clientes','productos','compras','cotizaciones','movimientos'].includes(paginaActual) ? 'none' : 'flex';
   requestAnimationFrame(()=>app.classList.add('page-in'));
 }
 
