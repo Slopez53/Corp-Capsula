@@ -382,9 +382,11 @@ textarea{resize:none;height:64px;line-height:1.5}
 @media print{
   body>*:not(#print-zone){display:none!important}
   #print-zone{display:block!important;font-family:'Courier New',monospace;
-    font-size:18pt;color:#000;background:#fff;width:72mm;margin:0 auto;padding:3mm;}
+    font-size:18pt;color:#000;background:#fff;width:72mm;margin:0 auto;padding:3mm;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
   #print-zone *{color:#000!important;background:transparent!important}
-  #print-zone img{max-width:36mm;display:block;margin:0 auto 3mm}
+  #print-zone img{max-width:40mm;max-height:40mm;display:block;margin:0 auto 3mm;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .pr{white-space:pre;line-height:1.8;font-family:'Courier New',monospace}
 }
 #print-zone{display:none}
@@ -3559,20 +3561,24 @@ function generarReciboHTML(v) {
   return lines.join('\n');
 }
 
+// Construye el contenido del área de impresión (logo + recibo) para una venta
+function construirPrintZone(venta) {
+  const pz = document.getElementById('print-zone');
+  if (!pz) return;
+  const html = generarReciboHTML(venta);
+  const logoHtml = DB.config.logo
+    ? `<img src="${DB.config.logo}" alt="Logo">`
+    : '';
+  pz.innerHTML = logoHtml + '<div class="pr">' + html + '</div>';
+}
+
 function mostrarReciboVenta(venta) {
   const txt  = generarReciboTexto(venta);
-  const html = generarReciboHTML(venta);
   reciboTxt  = txt;
   ventaSelId = venta.id;
   const prev = document.getElementById('recibo-preview');
   if (prev) prev.textContent = txt;
-  const pz = document.getElementById('print-zone');
-  if (pz) {
-    const logoHtml = DB.config.logo
-      ? `<img src="${DB.config.logo}" alt="Logo" style="max-width:36mm;display:block;margin:0 auto 3mm">`
-      : '';
-    pz.innerHTML = logoHtml + '<div class="pr">' + html + '</div>';
-  }
+  construirPrintZone(venta);
   openModal('m-recibo');
 }
 
@@ -3584,16 +3590,30 @@ function abrirRecibo() {
 }
 
 function imprimirRecibo() {
-  setTimeout(() => {
+  const v = DB.ventas.find(x=>x.id===ventaSelId);
+  if (v) construirPrintZone(v); // reconstruye por si el área fue limpiada
+  const pz  = document.getElementById('print-zone');
+  const img = pz ? pz.querySelector('img') : null;
+
+  const doPrint = () => {
     try {
       window.print();
-      // Clear print zone after print for privacy
-      setTimeout(() => {
-        const pz = document.getElementById('print-zone');
-        if (pz) pz.innerHTML = '';
-      }, 2000);
+      setTimeout(() => { const z=document.getElementById('print-zone'); if (z) z.innerHTML=''; }, 2000);
     } catch(e) { toast('Verifica que la impresora Bluetooth esté conectada.', true); }
-  }, 150);
+  };
+
+  // Esperar a que el logo termine de cargar/decodificar antes de imprimir
+  if (img && !img.complete) {
+    let done = false;
+    const go = () => { if (done) return; done = true; doPrint(); };
+    img.onload  = go;
+    img.onerror = go;
+    setTimeout(go, 1200); // tope de seguridad si el logo no carga
+  } else if (img && img.decode) {
+    img.decode().then(doPrint).catch(doPrint);
+  } else {
+    setTimeout(doPrint, 150);
+  }
 }
 
 function compartirReciboTexto() {
