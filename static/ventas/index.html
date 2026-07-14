@@ -550,6 +550,7 @@ body.offline .offline-badge{display:inline}
     <button class="modal-close" onclick="closeModal('m-recibo')">✕</button>
     <div class="modal-title">🖨️ Vista del Recibo</div>
     <div class="recibo-preview" id="recibo-preview"></div>
+    <div id="recibo-wa-btn"></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap">
       <button class="btn btn-green" style="flex:1" onclick="imprimirRecibo()">🖨️ Bluetooth</button>
       <button class="btn btn-surface" style="flex:1" onclick="compartirReciboTexto()">📤 Compartir</button>
@@ -890,9 +891,23 @@ const PALETAS = {
 const DARK_VARS  = { bg:'#0a0b0f', sfc:'#15161c', sfc2:'#20222b', border:'rgba(255,255,255,.09)', text:'#f0f1f3', muted:'#9096a1', dim:'#454b57', shadow:'0 8px 32px rgba(0,0,0,.5)' };
 const LIGHT_VARS = { bg:'#f3f4f7', sfc:'#ffffff', sfc2:'#eef0f4', border:'rgba(0,0,0,.1)', text:'#14161c', muted:'#5b6470', dim:'#c0c6d0', shadow:'0 4px 20px rgba(0,0,0,.1)' };
 
+// Convierte un hex a "r,g,b"
+function hexRGB(hex) {
+  const h = String(hex||'').replace('#','');
+  const n = h.length===3 ? h.split('').map(c=>c+c).join('') : h;
+  const int = parseInt(n,16);
+  return [(int>>16)&255, (int>>8)&255, int&255];
+}
+
 function applyTheme() {
   const r   = document.documentElement.style;
-  const pal = PALETAS[DB.config.theme] || PALETAS.blue;
+  let pal   = PALETAS[DB.config.theme] || PALETAS.blue;
+  // Color de acento personalizado
+  if (DB.config.customAccent) {
+    const [rr,gg,bb] = hexRGB(DB.config.customAccent);
+    pal = { accent:DB.config.customAccent, adim:`rgba(${rr},${gg},${bb},.13)`,
+            accent2:pal.accent2, green:pal.green, gdim:pal.gdim };
+  }
   const mode= DB.config.darkMode !== false ? DARK_VARS : LIGHT_VARS;
   Object.entries({...mode, ...pal}).forEach(([k,v]) => r.setProperty('--'+k, v));
   const meta = document.getElementById('meta-theme');
@@ -985,6 +1000,9 @@ let DB = {
     gdriveClientId: '',
     metaMensual:    0,
     verGanancias:   true,
+    customAccent:   '',
+    reciboWA:       true,
+    saludo:         true,
   },
   productos: ['Salchichas','Chorizo','Jamón','Mortadela','Salami','Tocino','Longaniza','Butifarra'],
   unidades:      {},
@@ -1002,6 +1020,7 @@ let DB = {
   ingresos:     [],
   cotizaciones: [],
   barcodes:     {},
+  favoritos:    [],
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1084,6 +1103,7 @@ function cargar() {
     DB.ingresos     = Array.isArray(p.ingresos)     ? p.ingresos     : [];
     DB.cotizaciones = Array.isArray(p.cotizaciones) ? p.cotizaciones : [];
     DB.barcodes     = (p.barcodes && typeof p.barcodes==='object') ? p.barcodes : {};
+    DB.favoritos    = Array.isArray(p.favoritos) ? p.favoritos : [];
     DB.config    = { ...DB.config, ...(p.config||{}) };
     DB.ventas.forEach((v,i) => {
       if (!v.numRecibo) v.numRecibo = i+1;
@@ -1113,6 +1133,9 @@ function cargar() {
     if (!DB.config.gdriveClientId)          DB.config.gdriveClientId = '';
     if (DB.config.metaMensual  === undefined) DB.config.metaMensual  = 0;
     if (DB.config.verGanancias === undefined) DB.config.verGanancias = true;
+    if (DB.config.customAccent === undefined) DB.config.customAccent = '';
+    if (DB.config.reciboWA     === undefined) DB.config.reciboWA     = true;
+    if (DB.config.saludo       === undefined) DB.config.saludo       = true;
     // Migrate clients: string[] → object[]
     DB.clientes = DB.clientes.map(c =>
       typeof c === 'string' ? { id: uid(), nombre: c, tel:'', ubicacion:null, notas:'' } : c
@@ -1583,6 +1606,18 @@ function renderVenta() {
             onclick="verCliente('${esc(vF.cliente.trim())}')">Ver perfil →</button>
         </div>`:''}
     </div>
+
+    ${(DB.favoritos||[]).length ? `
+    <div class="card">
+      <div class="card-title">⚡ Venta rápida</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px">
+        ${DB.favoritos.filter(p=>DB.productos.includes(p)).map(p=>{
+          const pr=(DB.precios||{})[p]; const u=DB.unidades[p]||'';
+          return `<button class="price-pill" style="padding:8px 13px;font-size:.86em" onclick="agregarProductoVenta('${esc(p)}')">
+            ${esc(p)}${pr?` <span style="opacity:.7">${fmt(pr)}${u?'/'+esc(u):''}</span>`:''}</button>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
 
     <div class="card">
       <div class="card-title">Productos y servicios</div>
@@ -3240,6 +3275,33 @@ function renderAjustes() {
       </div>
     </div>
 
+    <!-- Automatización -->
+    <div class="card">
+      <div class="card-title">⚡ Automatización</div>
+      <div class="ajuste-row">
+        <div>
+          <div class="ajuste-lbl">Enviar recibo por WhatsApp</div>
+          <div class="ajuste-sub">Botón directo al cliente tras cada venta</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${DB.config.reciboWA!==false?'checked':''}
+            onchange="DB.config.reciboWA=this.checked;guardar()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="ajuste-row">
+        <div>
+          <div class="ajuste-lbl">Saludo según la hora</div>
+          <div class="ajuste-sub">Buenos días / tardes / noches en el encabezado</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${DB.config.saludo!==false?'checked':''}
+            onchange="DB.config.saludo=this.checked;guardar();toast('Se aplica al reabrir')">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
     <!-- Apariencia -->
     <div class="card">
       <div class="card-title">Apariencia</div>
@@ -3256,11 +3318,17 @@ function renderAjustes() {
         <div><div class="ajuste-lbl">Color de acento</div></div>
         <div class="theme-swatches">
           ${Object.entries(palColores).map(([k,c])=>`
-            <div class="theme-swatch${DB.config.theme===k?' active':''}"
+            <div class="theme-swatch${DB.config.theme===k&&!DB.config.customAccent?' active':''}"
               style="background:${c}"
               onclick="setTheme('${k}')"
               title="${palNombres[k]||k}"></div>`).join('')}
+          <label class="theme-swatch${DB.config.customAccent?' active':''}" style="background:${DB.config.customAccent||'conic-gradient(from 0deg,#f85149,#d29922,#3fb950,#4493f8,#a371f7,#f85149)'};display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative" title="Color personalizado">
+            <input type="color" value="${DB.config.customAccent||'#4493f8'}" style="opacity:0;position:absolute;inset:0;width:100%;height:100%;cursor:pointer;padding:0;border:none"
+              oninput="setColorPersonalizado(this.value)">
+            ${DB.config.customAccent?'':'<span style="font-size:.9em;filter:drop-shadow(0 0 2px #000)">🎨</span>'}
+          </label>
         </div>
+        ${DB.config.customAccent?`<button class="btn-sm" style="background:var(--sfc2);border:1px solid var(--border);color:var(--muted)" onclick="setColorPersonalizado('')">✕ Quitar color personalizado</button>`:''}
       </div>
 
       <div class="ajuste-row" style="flex-direction:column;align-items:flex-start;gap:8px">
@@ -3432,6 +3500,14 @@ function toggleDark(on) {
 
 function setTheme(t) {
   DB.config.theme = t;
+  DB.config.customAccent = '';   // un preset reemplaza el color personalizado
+  guardar();
+  applyTheme();
+  goTo('ajustes');
+}
+
+function setColorPersonalizado(hex) {
+  DB.config.customAccent = hex || '';
   guardar();
   applyTheme();
   goTo('ajustes');
@@ -3783,7 +3859,22 @@ function mostrarReciboVenta(venta) {
   const prev = document.getElementById('recibo-preview');
   if (prev) prev.textContent = txt;
   construirPrintZone(venta);
+  // Botón de envío directo por WhatsApp si el cliente tiene teléfono
+  const waBox = document.getElementById('recibo-wa-btn');
+  if (waBox) {
+    const c = getClienteObj(venta.cliente);
+    waBox.innerHTML = (DB.config.reciboWA!==false && c && c.tel)
+      ? `<button class="btn btn-primary" style="margin-bottom:7px;background:#25D366;box-shadow:0 4px 16px -4px #25D366" onclick="enviarReciboWA('${esc(venta.cliente)}')">📲 Enviar recibo a ${esc(venta.cliente)}</button>`
+      : '';
+  }
   openModal('m-recibo');
+}
+
+function enviarReciboWA(nombre) {
+  const c = getClienteObj(nombre);
+  const t = telWA(c?.tel);
+  if (!t) { toast('El cliente no tiene teléfono guardado', true); return; }
+  window.open('https://wa.me/'+t+'?text='+encodeURIComponent(reciboTxt), '_blank');
 }
 
 function abrirRecibo() {
@@ -4287,9 +4378,11 @@ function borrarDoc(id) {
 function renderProductos() {
   const prodList = DB.productos.map((p, i) => {
     const tieneBarcode = Object.values(DB.barcodes||{}).includes(p);
+    const esFav = (DB.favoritos||[]).includes(p);
     return `
     <div class="prod-page-item" data-nombre="${esc(p)}" style="flex-direction:column;align-items:stretch;gap:8px">
       <div style="display:flex;align-items:center;gap:6px">
+        <button class="btn-sm" style="background:none;border:none;padding:2px;font-size:1.05em;filter:${esFav?'none':'grayscale(1) opacity(.4)'}" onclick="toggleFavorito('${esc(p)}')" title="${esFav?'Quitar de favoritos':'Marcar favorito (venta rápida)'}">⭐</button>
         <span style="flex:1;font-weight:600">${esc(p)}</span>
         <button class="btn-sm" style="background:${tieneBarcode?'var(--gdim)':'var(--sfc2)'};color:${tieneBarcode?'var(--green)':'var(--muted)'};border:1px solid var(--border)" onclick="asignarBarcode('${esc(p)}')" title="${tieneBarcode?'Código asignado':'Asignar código de barras'}">📷</button>
         <select class="unit-select" data-prod="${esc(p)}" onchange="setUnidadEvt(this)" style="width:68px">
@@ -4390,6 +4483,19 @@ let _asignBarcodeProd = '';
 function asignarBarcode(prod) {
   _asignBarcodeProd = prod;
   abrirEscaner('asignar-existente');
+}
+
+// Favoritos: productos de venta rápida (aparecen como chips en Nueva venta)
+function toggleFavorito(prod) {
+  if (!DB.favoritos) DB.favoritos = [];
+  const i = DB.favoritos.indexOf(prod);
+  if (i >= 0) { DB.favoritos.splice(i,1); toast('Quitado de favoritos'); }
+  else {
+    if (DB.favoritos.length >= 8) { toast('Máximo 8 favoritos', true); return; }
+    DB.favoritos.push(prod); toast('⭐ ' + prod + ' en venta rápida');
+  }
+  guardar(); vibrar();
+  if (paginaActual === 'productos') render();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5565,11 +5671,46 @@ function renderMovimientos() {
       <div class="stat green"><div class="stat-val">${fmt(iHoy)}</div><div class="stat-lbl">Ingresos extra hoy</div></div>
       <div class="stat" style="background:var(--rdim);border-color:rgba(248,81,73,.3)"><div class="stat-val" style="color:var(--red)">${fmt(gHoy)}</div><div class="stat-lbl">Gastos hoy</div></div>
     </div>
-    <div style="display:flex;gap:7px;margin-bottom:12px">
+    <div style="display:flex;gap:7px;margin-bottom:9px">
       <button class="btn btn-green" style="flex:1" onclick="abrirIngreso()">💵 Ingreso extra</button>
       <button class="btn btn-red" style="flex:1" onclick="abrirGasto()">💸 Gasto</button>
     </div>
+    <button class="btn btn-surface" style="margin-bottom:12px" onclick="cierreCaja()">🧾 Cierre de caja del día</button>
     <div class="card"><div class="card-title">Historial reciente</div>${lista}</div>`;
+}
+
+// Cierre de caja: resumen del día listo para compartir/imprimir
+function cierreCaja() {
+  const h = hoy();
+  const vh = DB.ventas.filter(v => v.fecha === h);
+  const facturado = vh.reduce((s,v)=>s+neto(v),0);
+  const cobrado = vh.filter(v=>v.pago!=='fiado'||v.fiadoPagado).reduce((s,v)=>s+neto(v),0)
+                + vh.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+montoPagadoItems(v),0);
+  const fiadoNuevo = vh.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+montoPendienteV(v),0);
+  const gastos = (DB.gastos||[]).filter(g=>(g.fecha||'').slice(0,10)===h).reduce((s,g)=>s+(+g.monto||0),0);
+  const ingresos = (DB.ingresos||[]).filter(g=>(g.fecha||'').slice(0,10)===h).reduce((s,g)=>s+(+g.monto||0),0);
+  const ganancia = vh.reduce((s,v)=>s+gananciaVenta(v),0);
+  const enCaja = cobrado + ingresos - gastos;
+  const verGan = DB.config.verGanancias!==false && hayDatosCosto();
+
+  const L = [];
+  L.push('🧾 CIERRE DE CAJA');
+  L.push(DB.config.negocio || 'Mi Negocio');
+  L.push('📅 ' + fmtFecha(h));
+  L.push('━━━━━━━━━━━━━━');
+  L.push('🛍️ Ventas: ' + vh.length);
+  L.push('💰 Facturado: ' + fmt(facturado));
+  L.push('💵 Cobrado: ' + fmt(cobrado));
+  if (fiadoNuevo>0) L.push('📋 Fiado nuevo: ' + fmt(fiadoNuevo));
+  if (ingresos>0)   L.push('➕ Ingresos extra: ' + fmt(ingresos));
+  if (gastos>0)     L.push('➖ Gastos: ' + fmt(gastos));
+  if (verGan)       L.push('📈 Ganancia: ' + fmt(ganancia));
+  L.push('━━━━━━━━━━━━━━');
+  L.push('🔒 EN CAJA: ' + fmt(enCaja));
+  const txt = L.join('\n');
+
+  if (navigator.share) navigator.share({ text: txt, title: 'Cierre de caja' }).catch(()=>mostrarExport(txt));
+  else mostrarExport(txt);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5726,7 +5867,16 @@ actualizarLogo();
 
 const hdrFecha = new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});
 const hdrEl = document.getElementById('hdr-date');
-if (hdrEl) hdrEl.textContent = hdrFecha.charAt(0).toUpperCase()+hdrFecha.slice(1);
+if (hdrEl) {
+  const fechaCap = hdrFecha.charAt(0).toUpperCase()+hdrFecha.slice(1);
+  if (DB.config.saludo !== false) {
+    const hh = new Date().getHours();
+    const saludo = hh < 12 ? '☀️ Buenos días' : hh < 19 ? '👋 Buenas tardes' : '🌙 Buenas noches';
+    hdrEl.textContent = saludo + ' · ' + fechaCap;
+  } else {
+    hdrEl.textContent = fechaCap;
+  }
+}
 
 // Offline badge sync
 if (!navigator.onLine) document.body.classList.add('offline');
