@@ -665,6 +665,41 @@ body.offline .offline-badge{display:inline}
   </div>
 </div>
 
+<!-- Modal: nuevo producto -->
+<div class="modal-bg" id="m-nuevo-prod" onclick="bgClose(event,'m-nuevo-prod')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('m-nuevo-prod')">✕</button>
+    <div class="modal-title">📦 Nuevo producto</div>
+    <label class="input-label">Nombre *</label>
+    <input type="text" id="np-nombre" placeholder="Ej: Salchichón" autocomplete="off" style="margin-bottom:10px">
+    <label class="input-label">Unidad de medida</label>
+    <select id="np-unidad" style="margin-bottom:12px">
+      <option value="">Unidad (por pieza)</option>
+      <option value="lb">Libra (lb)</option>
+      <option value="kg">Kilogramo (kg)</option>
+      <option value="gr">Gramo (gr)</option>
+      <option value="paq">Paquete (paq)</option>
+      <option value="unid">Unidad (unid)</option>
+    </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:16px">
+      <div>
+        <div class="compra-price-lbl">💸 Costo</div>
+        <input type="number" min="0" inputmode="decimal" id="np-costo" placeholder="0" style="padding:8px 7px;font-size:.86em;text-align:right">
+      </div>
+      <div>
+        <div class="compra-price-lbl accent">🏷️ Venta</div>
+        <input type="number" min="0" inputmode="decimal" id="np-venta" placeholder="0" style="padding:8px 7px;font-size:.86em;text-align:right;border-color:var(--accent)">
+      </div>
+      <div>
+        <div class="compra-price-lbl green">🧍 Detal</div>
+        <input type="number" min="0" inputmode="decimal" id="np-detal" placeholder="0" style="padding:8px 7px;font-size:.86em;text-align:right;border-color:var(--green)">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="guardarNuevoProducto()">✅ Agregar producto</button>
+  </div>
+</div>
+
 <!-- Modal: gasto rápido -->
 <div class="modal-bg" id="m-gasto" onclick="bgClose(event,'m-gasto')">
   <div class="modal">
@@ -3931,7 +3966,7 @@ function borrarDoc(id) {
 // ═══════════════════════════════════════════════════════════
 function renderProductos() {
   const prodList = DB.productos.map((p, i) => `
-    <div class="prod-page-item" style="flex-direction:column;align-items:stretch;gap:8px">
+    <div class="prod-page-item" data-nombre="${esc(p)}" style="flex-direction:column;align-items:stretch;gap:8px">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="flex:1;font-weight:600">${esc(p)}</span>
         <select class="unit-select" data-prod="${esc(p)}" onchange="setUnidadEvt(this)" style="width:68px">
@@ -3968,35 +4003,57 @@ function renderProductos() {
   return `
     <div class="section-title">📦 Registro de Productos <span class="badge">${DB.productos.length}</span></div>
 
-    <div class="card" style="background:var(--adim);border-color:rgba(68,147,248,.25);margin-bottom:11px">
-      <div style="font-size:.82em;color:var(--text);line-height:1.55">
-        💡 Asigna la <b>unidad</b>, el <b>precio de venta</b> (mayoreo) y el <b>precio detal</b> de cada producto.<br>
-        En la venta aparecen pills para elegir el tier. En compras se actualizan automáticamente.
-      </div>
-    </div>
+    <button class="btn btn-green" style="margin-bottom:11px" onclick="abrirNuevoProducto()">＋ Nuevo producto</button>
 
     <div class="card">
       <div class="card-title">Catálogo</div>
+      ${DB.productos.length > 6 ? `<input type="search" id="prod-filtro" placeholder="🔍 Filtrar producto..."
+        oninput="filtrarCatalogo(this.value)" style="margin-bottom:10px">` : ''}
       <div id="prod-cat-pg">
-        ${prodList || '<div style="color:var(--muted);font-size:.84em;padding:7px 0">Sin productos. Agrega el primero abajo.</div>'}
+        ${prodList || '<div style="color:var(--muted);font-size:.84em;padding:7px 0">Sin productos. Toca ＋ Nuevo producto.</div>'}
       </div>
-      <div class="add-row" style="margin-top:11px">
-        <input type="text" id="inp-prod-pg" placeholder="Nuevo producto..."
-          onkeypress="if(event.key==='Enter'){event.preventDefault();addProdPg()}">
-        <button class="btn-sm btn-green" onclick="addProdPg()">＋</button>
-      </div>
+    </div>
+    <div style="font-size:.76em;color:var(--muted);text-align:center;padding:6px 12px;line-height:1.5">
+      💡 El costo, precio de venta y detal se actualizan solos al registrar compras y ventas.
     </div>
   `;
 }
 
-function addProdPg() {
-  const inp = document.getElementById('inp-prod-pg'); if (!inp) return;
-  const n = inp.value.trim();
+function filtrarCatalogo(q) {
+  q = (q||'').toLowerCase().trim();
+  document.querySelectorAll('#prod-cat-pg .prod-page-item').forEach(el => {
+    const name = (el.getAttribute('data-nombre')||'').toLowerCase();
+    el.style.display = !q || name.includes(q) ? '' : 'none';
+  });
+}
+
+function abrirNuevoProducto() {
+  document.getElementById('np-nombre').value = '';
+  document.getElementById('np-unidad').value = '';
+  document.getElementById('np-costo').value  = '';
+  document.getElementById('np-venta').value  = '';
+  document.getElementById('np-detal').value  = '';
+  openModal('m-nuevo-prod');
+  setTimeout(()=>document.getElementById('np-nombre')?.focus(), 150);
+}
+
+function guardarNuevoProducto() {
+  const n = document.getElementById('np-nombre').value.trim();
   if (!n) { toast('Escribe un nombre', true); return; }
-  if (DB.productos.includes(n)) { toast('Ya existe', true); inp.value = ''; return; }
-  DB.productos.push(n); guardar();
-  toast('Producto agregado');
-  goTo('productos');
+  if (DB.productos.includes(n)) { toast('Ese producto ya existe', true); return; }
+  const unidad = document.getElementById('np-unidad').value;
+  const costo  = +document.getElementById('np-costo').value || 0;
+  const venta  = +document.getElementById('np-venta').value || 0;
+  const detal  = +document.getElementById('np-detal').value || 0;
+  DB.productos.push(n);
+  if (unidad)   DB.unidades[n]      = unidad;
+  if (costo>0)  DB.preciosCompra[n] = costo;
+  if (venta>0)  DB.precios[n]       = venta;
+  if (detal>0)  DB.preciosPie[n]    = detal;
+  guardar(); vibrar();
+  closeModal('m-nuevo-prod');
+  toast('📦 ' + n + ' agregado');
+  if (paginaActual === 'productos') render();
 }
 
 // ═══════════════════════════════════════════════════════════
