@@ -3296,16 +3296,55 @@ function quitarLogo() {
 
 function actualizarLogo() {
   const wrap = document.getElementById('hdr-icon-wrap');
-  if (!wrap) return;
-  if (DB.config.logo) {
-    wrap.textContent = '';
-    const img = document.createElement('img');
-    img.alt = 'Logo';
-    img.src = DB.config.logo;
-    wrap.appendChild(img);
-  } else {
-    wrap.textContent = '🥩';
+  if (wrap) {
+    if (DB.config.logo) {
+      wrap.textContent = '';
+      const img = document.createElement('img');
+      img.alt = 'Logo';
+      img.src = DB.config.logo;
+      wrap.appendChild(img);
+    } else {
+      wrap.textContent = '🥩';
+    }
   }
+  prepararLogoBW();
+}
+
+// Logo en blanco y negro puro (1-bit) para impresoras térmicas Bluetooth.
+// Las térmicas no imprimen color ni grises: sin esto, un logo a color sale en blanco.
+let _logoBW = '';
+function prepararLogoBW() {
+  _logoBW = '';
+  if (!DB.config.logo) return;
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const MAX = 320;                         // ancho objetivo para papel térmico
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#fff';                  // fondo blanco (elimina transparencia)
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h);
+      const px = data.data;
+      // Umbral automático (promedio de luminancia) para separar tinta de fondo
+      let sum = 0;
+      for (let i = 0; i < px.length; i += 4) sum += (px[i]*0.299 + px[i+1]*0.587 + px[i+2]*0.114);
+      const avg = sum / (px.length / 4);
+      const umbral = Math.min(200, Math.max(120, avg * 0.85));
+      for (let i = 0; i < px.length; i += 4) {
+        const lum = px[i]*0.299 + px[i+1]*0.587 + px[i+2]*0.114;
+        const v = lum < umbral ? 0 : 255;      // negro puro o blanco puro
+        px[i] = px[i+1] = px[i+2] = v; px[i+3] = 255;
+      }
+      ctx.putImageData(data, 0, 0);
+      _logoBW = cv.toDataURL('image/png');
+    } catch(e) { _logoBW = ''; }
+  };
+  img.src = DB.config.logo;
 }
 
 function setUnidad(prod, u) {
@@ -3566,9 +3605,9 @@ function construirPrintZone(venta) {
   const pz = document.getElementById('print-zone');
   if (!pz) return;
   const html = generarReciboHTML(venta);
-  const logoHtml = DB.config.logo
-    ? `<img src="${DB.config.logo}" alt="Logo">`
-    : '';
+  // Para impresión usamos el logo en blanco y negro (compatible con térmicas)
+  const logoSrc = _logoBW || DB.config.logo;
+  const logoHtml = logoSrc ? `<img src="${logoSrc}" alt="Logo">` : '';
   pz.innerHTML = logoHtml + '<div class="pr">' + html + '</div>';
 }
 
