@@ -1321,22 +1321,70 @@ function htmlFilas() {
         ${varList.map(v=>`<option value="${esc(v)}" ${(it.variante||'')==v?'selected':''}>${esc(v)}</option>`).join('')}
       </select>` : '';
 
+    const cantN = +it.cant||0, precN = +it.precio||0, sub = cantN*precN;
+    const subLine = sub > 0 ? `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:.78em">
+        <span style="color:var(--muted)">${fmtCant(cantN)}${unidad?' '+esc(unidad):''} × ${fmt(precN)}</span>
+        <span style="font-weight:700;color:var(--green)">= ${fmt(sub)}</span>
+      </div>` : '';
+    // Para productos por peso: botón para vender por monto (calcula el peso)
+    const porMonto = esPeso ? `
+      <button class="price-pill" style="margin-top:4px" onclick="venderPorMonto(${i})">💵 Vender por monto ($)</button>` : '';
+
     return `<div>
       <div class="prod-row">
         ${campo}
         <input type="number" inputmode="decimal" min="0" step="${esPeso?'0.01':'1'}" placeholder="${esc(cantPlaceholder)}"
           value="${esc(String(it.cant))}" style="padding:8px 7px;font-size:.86em${esPeso?';border-color:var(--accent)':''}"
-          oninput="vF.items[${i}].cant=+this.value||0;calcTotal()">
+          oninput="vF.items[${i}].cant=+this.value||0;calcTotal();actualizarSubfila(${i})">
         <input type="number" inputmode="decimal" min="0"
           placeholder="${priceHint}"
           value="${it.precio===''?'':esc(String(it.precio))}" style="padding:8px 7px;font-size:.86em"
-          oninput="vF.items[${i}].precio=+this.value||0;calcTotal()">
+          oninput="vF.items[${i}].precio=+this.value||0;calcTotal();actualizarSubfila(${i})">
         ${del}
       </div>
       ${varSelect}
+      <div id="subfila-${i}">${subLine}</div>
+      ${porMonto}
       ${pricePills}
     </div>`;
   }).join('');
+}
+
+// Recalcula el subtotal en vivo de una fila sin re-renderizar (mantiene el foco)
+function actualizarSubfila(i) {
+  const it = vF.items[i]; if (!it) return;
+  const el = document.getElementById('subfila-'+i); if (!el) return;
+  const cantN = +it.cant||0, precN = +it.precio||0, sub = cantN*precN;
+  const unidad = DB.unidades[it.prod] || '';
+  el.innerHTML = sub > 0 ? `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:.78em">
+      <span style="color:var(--muted)">${fmtCant(cantN)}${unidad?' '+esc(unidad):''} × ${fmt(precN)}</span>
+      <span style="font-weight:700;color:var(--green)">= ${fmt(sub)}</span>
+    </div>` : '';
+}
+
+// Vender por monto: el cliente pide "$X de producto" → calcula el peso automáticamente
+function venderPorMonto(i) {
+  const it = vF.items[i]; if (!it) return;
+  const unidad = DB.unidades[it.prod] || 'lb';
+  let precio = +it.precio || 0;
+  if (precio <= 0) {
+    const pv = (DB.precios||{})[it.prod];
+    if (pv) precio = pv;
+  }
+  if (precio <= 0) { toast('Primero pon el precio por '+unidad, true); return; }
+  const montoStr = prompt('¿Cuánto en dinero ('+DB.config.moneda+')?\nPrecio: '+fmt(precio)+'/'+unidad);
+  if (montoStr === null) return;
+  const monto = parseFloat(String(montoStr).replace(/[^\d.]/g,''));
+  if (!monto || monto <= 0) { toast('Monto inválido', true); return; }
+  const peso = Math.round((monto / precio) * 1000) / 1000;
+  vF.items[i].cant   = peso;
+  vF.items[i].precio = precio;
+  refrescarFilas();
+  calcTotal();
+  vibrar();
+  toast('⚖️ ' + fmtCant(peso) + ' ' + unidad + ' por ' + fmt(monto));
 }
 
 function cambiarProd(i, sel) {
