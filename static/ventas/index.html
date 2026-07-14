@@ -2,10 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0d1117" id="meta-theme">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0f" id="meta-theme">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Mis Ventas</title>
 <link rel="manifest" href="manifest.json">
 <style>
@@ -30,9 +31,12 @@
 html{scroll-behavior:smooth}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;font-size:var(--fs);
   background:var(--bg);color:var(--text);min-height:100dvh;max-width:480px;
-  margin:0 auto;display:flex;flex-direction:column;position:relative;
+  margin:0 auto;display:flex;flex-direction:column;position:relative;overflow-x:hidden;
   letter-spacing:-.011em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
   font-variant-numeric:tabular-nums;}
+/* Encabezado se adapta a letra grande sin romperse */
+.hdr h1{overflow-wrap:anywhere;line-height:1.15}
+body[data-fs="xl"] .hdr,body[data-fs="xxl"] .hdr{flex-wrap:wrap;gap:6px}
 /* Fondo con resplandor sutil para dar profundidad moderna */
 body::before{content:'';position:fixed;top:-15%;left:50%;transform:translateX(-50%);
   width:120%;height:45%;pointer-events:none;z-index:0;
@@ -41,7 +45,7 @@ body::before{content:'';position:fixed;top:-15%;left:50%;transform:translateX(-5
 .hdr,#app,nav,#calc-fab{position:relative;z-index:1}
 /* HEADER */
 .hdr{display:flex;align-items:center;justify-content:space-between;
-  padding:13px 15px 11px;background:var(--glass-hdr-bg);
+  padding:calc(13px + env(safe-area-inset-top,0px)) 15px 11px;background:var(--glass-hdr-bg);
   backdrop-filter:blur(max(var(--glass-blur),16px)) saturate(var(--glass-sat));
   -webkit-backdrop-filter:blur(max(var(--glass-blur),16px)) saturate(var(--glass-sat));
   position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border);}
@@ -189,9 +193,18 @@ textarea{resize:none;height:64px;line-height:1.5}
 .pago-pill.active{border-color:var(--accent);color:var(--accent);background:var(--adim);font-weight:600;}
 .pago-pill.fiado.active{border-color:var(--warn);color:var(--warn);background:rgba(210,153,34,.1)}
 /* PRODUCT ROWS */
-.prod-row{display:grid;grid-template-columns:1fr 68px 82px 34px;
+.prod-row{display:grid;grid-template-columns:minmax(0,1fr) 68px 82px 34px;
   gap:5px;align-items:center;margin-bottom:7px;}
-.prod-row input,.prod-row select{padding:8px 7px;font-size:.86em}
+.prod-row>*{min-width:0}
+.prod-row input,.prod-row select{padding:8px 7px;font-size:.86em;min-width:0}
+/* Con letra grande, el renglón de producto se reacomoda en 2 filas para no desbordar */
+body[data-fs="xl"] .prod-row,body[data-fs="xxl"] .prod-row{
+  grid-template-columns:1fr auto;
+  grid-template-areas:"prod del" "cant precio";}
+body[data-fs="xl"] .prod-row>*:nth-child(1),body[data-fs="xxl"] .prod-row>*:nth-child(1){grid-area:prod}
+body[data-fs="xl"] .prod-row>*:nth-child(2),body[data-fs="xxl"] .prod-row>*:nth-child(2){grid-area:cant}
+body[data-fs="xl"] .prod-row>*:nth-child(3),body[data-fs="xxl"] .prod-row>*:nth-child(3){grid-area:precio}
+body[data-fs="xl"] .prod-row>*:nth-child(4),body[data-fs="xxl"] .prod-row>*:nth-child(4){grid-area:del}
 /* PRICE TIER PILLS (venta form) */
 .price-pills{display:flex;gap:5px;margin:-3px 0 6px;flex-wrap:wrap}
 .price-pill{background:var(--adim);border:1px solid rgba(68,147,248,.35);
@@ -407,12 +420,15 @@ textarea{resize:none;height:64px;line-height:1.5}
 @media print{
   body>*:not(#print-zone){display:none!important}
   #print-zone{display:block!important;font-family:'Courier New',monospace;
-    font-size:18pt;color:#000;background:#fff;width:72mm;margin:0 auto;padding:3mm;
+    font-size:21pt;color:#000;background:#fff;width:72mm;margin:0 auto;padding:3mm;
+    text-align:center;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
   #print-zone *{color:#000!important;background:transparent!important}
-  #print-zone img{max-width:40mm;max-height:40mm;display:block;margin:0 auto 3mm;
+  #print-zone img{width:60mm;max-width:88%;height:auto;display:block;margin:0 auto 4mm;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .pr{white-space:pre;line-height:1.8;font-family:'Courier New',monospace}
+  .pr{white-space:pre;line-height:1.7;font-family:'Courier New',monospace;
+    text-align:left;display:inline-block;font-weight:600}
+  .pr-firma{font-size:.62em;line-height:1.4;font-weight:400}
 }
 #print-zone{display:none}
 /* UNIT TAG */
@@ -555,6 +571,7 @@ body.offline .offline-badge{display:inline}
       <button class="btn btn-green" style="flex:1" onclick="imprimirRecibo()">🖨️ Bluetooth</button>
       <button class="btn btn-surface" style="flex:1" onclick="compartirReciboTexto()">📤 Compartir</button>
     </div>
+    <button class="btn btn-surface" style="margin-top:7px" onclick="generarPDFRecibo()">📄 Descargar PDF de la factura</button>
     <p style="font-size:.72em;color:var(--muted);text-align:center;margin-top:9px;line-height:1.5">
       Conecta tu impresora Bluetooth antes de tocar Imprimir.
     </p>
@@ -1230,15 +1247,28 @@ function toast(msg, err) {
   t._t = setTimeout(() => t.classList.remove('show'), 2700);
 }
 
-function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
-function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+// Gestión de modales integrada con el botón Atrás de Android.
+// Abrir un modal agrega una entrada al historial; así el botón Atrás lo cierra
+// en vez de salir de la app. El cierre manual no toca el historial (esa entrada
+// se consume de forma inofensiva en el siguiente Atrás).
+function openModal(id)  {
+  const el = document.getElementById(id);
+  if (!el || el.classList.contains('open')) return;
+  el.classList.add('open');
+  history.pushState({ modal:id, page:paginaActual, sub:(clienteVisto||compraVisto||null) }, '');
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('open');
+}
 function bgClose(e,id)  { if (e.target===e.currentTarget) closeModal(id); }
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const open = document.querySelector('.modal-bg.open:not(#m-doc-editor)');
     if (open) {
       if (open.id === 'm-scan' && typeof cerrarEscaner === 'function') { cerrarEscaner(); return; }
-      open.classList.remove('open'); return;
+      closeModal(open.id); return;
     }
   }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
@@ -1255,7 +1285,10 @@ function vibrar()       { if (DB.config.haptics !== false) try { navigator.vibra
 // FONT SIZE
 // ═══════════════════════════════════════════════════════════
 const FS = { small:'14px', medium:'16px', large:'19px', xl:'23px', xxl:'27px' };
-function aplicarFS() { document.documentElement.style.setProperty('--fs', FS[DB.config.fontSize]||'16px'); }
+function aplicarFS() {
+  document.documentElement.style.setProperty('--fs', FS[DB.config.fontSize]||'16px');
+  document.body.dataset.fs = DB.config.fontSize || 'medium';
+}
 
 // ═══════════════════════════════════════════════════════════
 // FECHAS
@@ -3161,7 +3194,10 @@ function renderInforme() {
         </div>`).join('')}
     </div>` : ''}
 
-    <button class="btn btn-surface" onclick="exportarInforme()">📤 Compartir informe</button>
+    <div style="display:flex;gap:7px">
+      <button class="btn btn-surface" style="flex:1" onclick="exportarInforme()">📤 Compartir</button>
+      <button class="btn btn-surface" style="flex:1" onclick="generarPDFInforme()">📄 PDF</button>
+    </div>
   `;
 }
 
@@ -3839,9 +3875,13 @@ function generarReciboHTML(v) {
     cen('¡Gracias por su compra!'),
     ...(DB.config.receiptFooter ? [cen(DB.config.receiptFooter.slice(0,W))] : []),
     rep('═',W),
-    ...(firma ? ['', rep('_',W), b(cen(firma)), cen('Firma')] : []),
   ];
-  return lines.join('\n');
+  let out = lines.join('\n');
+  // La firma va en fuente más pequeña para que no domine el recibo
+  if (firma) {
+    out += '\n<span class="pr-firma">\n' + rep('_',W) + '\n' + cen(firma) + '\n' + cen('Firma') + '</span>';
+  }
+  return out;
 }
 
 // Construye el contenido del área de impresión (logo + recibo) para una venta
@@ -4117,10 +4157,143 @@ function generarPDFInventario() {
   <script>setTimeout(()=>window.print(),700)<\/script>
   </body></html>`;
 
+  _abrirPDF(html);
+}
+
+// Abre una ventana con el HTML y lanza el diálogo de impresión (Guardar como PDF)
+function _abrirPDF(html) {
   const win = window.open('', '_blank');
-  if (!win) { toast('Permite ventanas emergentes para generar PDF', true); return; }
+  if (!win) { toast('Permite ventanas emergentes para generar el PDF', true); return; }
   win.document.write(html);
   win.document.close();
+}
+
+// Estilos base compartidos para los PDF
+function _pdfBaseCSS() {
+  return `*{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;padding:30px;max-width:800px;margin:0 auto;line-height:1.45}
+  .pdf-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #eef0f3;padding-bottom:16px;margin-bottom:20px}
+  .pdf-logo{width:64px;height:64px;border-radius:12px;object-fit:cover;flex-shrink:0}
+  h1{font-size:1.35em;margin-bottom:2px}
+  .sub{font-size:.8em;color:#888}
+  table{width:100%;border-collapse:collapse;font-size:.86em;margin:18px 0}
+  th{background:#f1f5f9;text-align:left;padding:9px 10px;font-size:.72em;text-transform:uppercase;letter-spacing:.05em;color:#555;border-bottom:2px solid #e5e7eb}
+  th:not(:first-child){text-align:right}
+  td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
+  td:not(:first-child){text-align:right}
+  .tf td{border-top:2px solid #e5e7eb;font-weight:700;font-size:1.02em;color:#2563eb}
+  .box{border:1px solid #e5e7eb;border-radius:10px;padding:12px 15px;margin-bottom:14px}
+  .stats{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .sb{border:1px solid #e5e7eb;border-radius:10px;padding:11px 16px;min-width:120px}
+  .sb .v{font-size:1.3em;font-weight:700;color:#2563eb}
+  .sb .l{font-size:.72em;color:#888;margin-top:2px}
+  footer{margin-top:22px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:.72em;color:#aaa;text-align:center}
+  @media print{@page{margin:16mm}}`;
+}
+
+// PDF de una factura / recibo (formato carta, no térmico)
+function generarPDFRecibo(venta) {
+  const v = venta || DB.ventas.find(x=>x.id===ventaSelId);
+  if (!v) { toast('Venta no encontrada', true); return; }
+  const negocio = DB.config.negocio || 'Mis Ventas';
+  const tel = DB.config.telefono || '';
+  const logo = DB.config.logo ? `<img src="${DB.config.logo}" class="pdf-logo" alt="logo">` : '';
+  const pl = { efectivo:'Efectivo', transferencia:'Transferencia', fiado:'Fiado / Por cobrar', otro:'Otro' };
+
+  const filas = v.items.map(it => {
+    const u = DB.unidades[it.prod]||'';
+    return `<tr><td>${esc(it.prod)}${it.servicio?' <span style="color:#888;font-size:.85em">(servicio)</span>':''}</td>
+      <td>${fmtCant(it.cant)}${u?' '+esc(u):''}</td>
+      <td>${fmt(it.precio)}</td>
+      <td>${fmt(it.cant*it.precio)}</td></tr>`;
+  }).join('');
+
+  const devs = (v.devoluciones||[]).map(d =>
+    `<tr><td colspan="3" style="color:#dc2626">${d.tipo==='averia'?'Avería':'Devolución'}: ${esc(d.prod)}</td><td style="color:#dc2626">-${fmt(d.monto)}</td></tr>`).join('');
+
+  const firma = DB.config.firma
+    ? `<div style="margin-top:50px;text-align:right"><div style="display:inline-block;border-top:1px solid #333;padding-top:6px;min-width:200px;text-align:center;font-size:.85em">${esc(DB.config.firma)}</div></div>`
+    : '';
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Factura #${String(v.numRecibo||0).padStart(4,'0')} · ${esc(negocio)}</title>
+  <style>${_pdfBaseCSS()}</style></head><body>
+  <div class="pdf-head">${logo}
+    <div style="flex:1">
+      <h1>${esc(negocio)}</h1>
+      <div class="sub">${tel?'Tel: '+esc(tel)+' · ':''}Factura de venta</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:1.1em;font-weight:700">#${String(v.numRecibo||0).padStart(4,'0')}</div>
+      <div class="sub">${fmtFecha(v.fecha)} ${fmtHora(v.ts)}</div>
+    </div>
+  </div>
+  <div class="box"><b>Cliente:</b> ${esc(v.cliente||'Sin nombre')}</div>
+  <table>
+    <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead>
+    <tbody>
+      ${filas}
+      ${devs}
+      <tr class="tf"><td colspan="3" style="text-align:right">TOTAL</td><td>${fmt(neto(v))}</td></tr>
+    </tbody>
+  </table>
+  <div class="box">
+    <div><b>Forma de pago:</b> ${pl[v.pago]||v.pago||''}</div>
+    ${v.pago==='fiado'&&!v.fiadoPagado&&montoPagadoItems(v)>0?`<div style="margin-top:4px">Abonado: <b>${fmt(montoPagadoItems(v))}</b> · Pendiente: <b style="color:#dc2626">${fmt(montoPendienteV(v))}</b></div>`:''}
+    ${v.nota?`<div style="margin-top:4px;color:#555"><b>Nota:</b> ${esc(v.nota)}</div>`:''}
+  </div>
+  ${firma}
+  <footer>${esc(negocio)} · ${DB.config.receiptFooter?esc(DB.config.receiptFooter)+' · ':''}¡Gracias por su compra!</footer>
+  <script>setTimeout(()=>window.print(),600)<\/script>
+  </body></html>`;
+  _abrirPDF(html);
+}
+
+// PDF del informe de ventas del período actual
+function generarPDFInforme() {
+  const { lbl, desde, hasta } = _rep;
+  const v = ventasRango(desde, hasta);
+  if (!v.length) { toast('Sin ventas en este período', true); return; }
+  const e = calcStats(v);
+  const negocio = DB.config.negocio || 'Mis Ventas';
+  const logo = DB.config.logo ? `<img src="${DB.config.logo}" class="pdf-logo" alt="logo">` : '';
+  const verGan = DB.config.verGanancias!==false && hayDatosCosto();
+
+  // Ranking de productos por unidades
+  const prodRows = Object.entries(e.prods).sort((a,b)=>b[1]-a[1]).map(([p,c])=>{
+    const u=DB.unidades[p]||''; const g=e.profitProd[p]||0;
+    return `<tr><td>${esc(p)}</td><td>${fmtCant(c)}${u?' '+esc(u):''}</td>${verGan?`<td>${fmt(g)}</td>`:''}</tr>`;
+  }).join('');
+
+  // Top clientes
+  const cliStats={}; v.forEach(x=>{ if(x.cliente) cliStats[x.cliente]=(cliStats[x.cliente]||0)+neto(x); });
+  const cliRows = Object.entries(cliStats).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([c,t])=>
+    `<tr><td>${esc(c)}</td><td>${fmt(t)}</td></tr>`).join('');
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Informe ${esc(negocio)}</title>
+  <style>${_pdfBaseCSS()}</style></head><body>
+  <div class="pdf-head">${logo}
+    <div style="flex:1"><h1>${esc(negocio)}</h1>
+      <div class="sub">Informe de ventas · ${esc(lbl)}: ${fmtFecha(desde)} — ${fmtFecha(hasta)}</div>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="sb"><div class="v">${fmt(e.total)}</div><div class="l">Ventas</div></div>
+    <div class="sb"><div class="v">${e.count}</div><div class="l"># Facturas</div></div>
+    <div class="sb"><div class="v">${e.clis.length}</div><div class="l">Clientes</div></div>
+    ${verGan?`<div class="sb"><div class="v">${fmt(e.ganancia)}</div><div class="l">Ganancia (${e.total>0?Math.round(e.ganancia/e.total*100):0}%)</div></div>`:''}
+    ${e.fiados>0?`<div class="sb"><div class="v">${fmt(e.fiados)}</div><div class="l">Por cobrar</div></div>`:''}
+  </div>
+  <h3 style="font-size:.95em;margin:6px 0 4px">Productos vendidos</h3>
+  <table><thead><tr><th>Producto</th><th>Unidades</th>${verGan?'<th>Ganancia</th>':''}</tr></thead>
+    <tbody>${prodRows||'<tr><td colspan="3">Sin datos</td></tr>'}</tbody></table>
+  ${cliRows?`<h3 style="font-size:.95em;margin:6px 0 4px">Top clientes</h3>
+  <table><thead><tr><th>Cliente</th><th>Total</th></tr></thead><tbody>${cliRows}</tbody></table>`:''}
+  <footer>${esc(negocio)} · Generado el ${new Date().toLocaleDateString('es')} </footer>
+  <script>setTimeout(()=>window.print(),600)<\/script>
+  </body></html>`;
+  _abrirPDF(html);
 }
 
 function renderInventario() {
@@ -6030,18 +6203,32 @@ vF.pago = DB.config.defaultPago || 'efectivo';
 // History-based back navigation (prevents PWA from exiting on back press)
 history.replaceState({ page:'venta', sub:null }, '');
 window.addEventListener('popstate', e => {
+  // 1) Si hay un modal abierto, el botón Atrás lo cierra (no navega ni sale)
+  const openM = document.querySelector('.modal-bg.open');
+  if (openM) {
+    if (openM.id === 'm-scan' && typeof cerrarEscaner === 'function') cerrarEscaner();
+    else openM.classList.remove('open');
+    return;
+  }
+
   const s = e.state;
-  if (!s) { history.pushState({ page:paginaActual, sub:null }, ''); return; }
-  // Restore page and sub-view from history state
-  paginaActual  = s.page || 'venta';
-  clienteVisto  = (s.sub && s.page === 'clientes') ? s.sub : null;
-  compraVisto   = (s.sub && s.page === 'compras')  ? s.sub : null;
-  if (!compraVisto) { compraFechaV = null; }
-  if (!compraVisto) compraMesNav = null;
-  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-  const navId = MAS_PAGES.includes(paginaActual) ? 'nav-mas' : ('nav-' + paginaActual);
-  document.getElementById(navId)?.classList.add('active');
-  render();
+
+  // 2) Navegación entre páginas por historial (incluye entradas de modal ya cerrado)
+  if (s && s.page) {
+    paginaActual  = s.page || 'venta';
+    clienteVisto  = (s.sub && s.page === 'clientes') ? s.sub : null;
+    compraVisto   = (s.sub && s.page === 'compras')  ? s.sub : null;
+    if (!compraVisto) { compraFechaV = null; compraMesNav = null; }
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    const navId = MAS_PAGES.includes(paginaActual) ? 'nav-mas' : ('nav-' + paginaActual);
+    document.getElementById(navId)?.classList.add('active');
+    render();
+    return;
+  }
+
+  // 4) No hay estado (raíz): si no estamos en inicio, ir a inicio; si ya, no salir
+  if (paginaActual !== 'venta') { goTo('venta'); return; }
+  history.pushState({ page:'venta', sub:null }, '');  // re-armar: nunca salir por accidente
 });
 
 const hdrNeg = document.getElementById('hdr-negocio');
