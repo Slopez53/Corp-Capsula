@@ -935,6 +935,8 @@ let DB = {
     pinSalt:        '',
     autoLockMin:    5,
     gdriveClientId: '',
+    metaMensual:    0,
+    verGanancias:   true,
   },
   productos: ['Salchichas','Chorizo','Jamón','Mortadela','Salami','Tocino','Longaniza','Butifarra'],
   unidades:      {},
@@ -1059,6 +1061,8 @@ function cargar() {
     if (!DB.config.pinSalt)                  DB.config.pinSalt       = '';
     if (!DB.config.autoLockMin)              DB.config.autoLockMin   = 5;
     if (!DB.config.gdriveClientId)          DB.config.gdriveClientId = '';
+    if (DB.config.metaMensual  === undefined) DB.config.metaMensual  = 0;
+    if (DB.config.verGanancias === undefined) DB.config.verGanancias = true;
     // Migrate clients: string[] → object[]
     DB.clientes = DB.clientes.map(c =>
       typeof c === 'string' ? { id: uid(), nombre: c, tel:'', ubicacion:null, notas:'' } : c
@@ -1079,6 +1083,25 @@ function fmtCant(n) { const x = Number(n)||0; return Number.isInteger(x) ? Strin
 // Devoluciones / averías descontadas de una factura
 function devTotal(v) { return (v.devoluciones||[]).reduce((s,d)=>s+(+d.monto||0),0); }
 function neto(v)     { return (v.total||0) - devTotal(v); }
+
+// ── Motor de ganancias ──────────────────────────────────────
+// Costo unitario de un producto (variante > costo de inventario > costo de compra)
+function costoUnitProd(prod, variante) {
+  const cv = DB.costosInv||{}, cc = DB.preciosCompra||{};
+  if (variante && cv[prod+'|'+variante] != null) return +cv[prod+'|'+variante] || 0;
+  return +cv[prod] || +cc[prod] || 0;
+}
+// Costo de los bienes vendidos en una venta (los servicios no tienen costo)
+function costoVenta(v) {
+  return (v.items||[]).reduce((s,it) => it.servicio ? s : s + (+it.cant||0)*costoUnitProd(it.prod, it.variante), 0);
+}
+// Ganancia real de una venta = ingreso neto − costo de los bienes
+function gananciaVenta(v) { return neto(v) - costoVenta(v); }
+// ¿Tenemos datos de costo suficientes para mostrar ganancias?
+function hayDatosCosto() {
+  const cv = DB.costosInv||{}, cc = DB.preciosCompra||{};
+  return Object.keys(cv).length > 0 || Object.keys(cc).length > 0;
+}
 
 // ── Crédito / cobros parciales ──────────────────────────────
 function montoPagadoItems(v) {
@@ -1635,6 +1658,8 @@ function renderHoy() {
   const totalGastos= gastosHoy.reduce((s,g)=>s+(+g.monto||0),0);
   const ingresosHoy= (DB.ingresos||[]).filter(g=>(g.fecha||'').slice(0,10)===hoy()).reduce((s,g)=>s+(+g.monto||0),0);
   const balance    = cobradoHoy + ingresosHoy - totalGastos;
+  const gananciaHoy= ventasHoy.reduce((s,v)=>s+gananciaVenta(v),0);
+  const verGan     = DB.config.verGanancias!==false && hayDatosCosto() && ventasHoy.length>0;
   const cliSet     = new Set(ventasHoy.map(v=>v.cliente).filter(Boolean));
 
   const prods = {};
@@ -1660,6 +1685,10 @@ function renderHoy() {
         <div style="font-weight:700;color:var(--green)">${fmt(cobradoHoy)}</div>
         <div style="color:var(--muted);margin-top:1px">💵 Cobrado</div>
       </div>
+      ${verGan?`<div style="flex:1;background:var(--adim);border:1px solid rgba(68,147,248,.25);border-radius:10px;padding:7px 10px;text-align:center">
+        <div style="font-weight:700;color:var(--accent)">${fmt(gananciaHoy)}</div>
+        <div style="color:var(--muted);margin-top:1px">📈 Ganancia</div>
+      </div>`:''}
       ${totalGastos>0?`<div style="flex:1;background:var(--rdim);border:1px solid rgba(248,81,73,.2);border-radius:10px;padding:7px 10px;text-align:center">
         <div style="font-weight:700;color:var(--red)">${fmt(totalGastos)}</div>
         <div style="color:var(--muted);margin-top:1px">💸 Gastos</div>
@@ -1668,11 +1697,9 @@ function renderHoy() {
         <div style="font-weight:700">${ventasHoy.length}</div>
         <div style="color:var(--muted);margin-top:1px">🛍️ Ventas</div>
       </div>
-      ${cliSet.size>0?`<div style="flex:1;background:var(--sfc);border:1px solid var(--border);border-radius:10px;padding:7px 10px;text-align:center">
-        <div style="font-weight:700">${cliSet.size}</div>
-        <div style="color:var(--muted);margin-top:1px">👥 Clientes</div>
-      </div>`:''}
     </div>`:''}
+
+    ${panelInteligente()}
 
     ${totalFiado > 0 ? `
     <div class="fiado-banner">
@@ -2833,11 +2860,17 @@ function ventasRango(desde,hasta) {
 }
 function calcStats(ventas) {
   const total  = ventas.reduce((s,v)=>s+neto(v),0);
+  const ganancia = ventas.reduce((s,v)=>s+gananciaVenta(v),0);
   const clis   = [...new Set(ventas.map(v=>v.cliente))];
-  const prods  = {};
+  const prods  = {};       // cantidad por producto
+  const profitProd = {};   // ganancia por producto
   const fiados = ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado).reduce((s,v)=>s+montoPendienteV(v),0);
-  ventas.forEach(v=>v.items.forEach(it=>{ prods[it.prod]=(prods[it.prod]||0)+it.cant; }));
-  return { total, count:ventas.length, clis, prods, fiados };
+  ventas.forEach(v=>v.items.forEach(it=>{
+    prods[it.prod]=(prods[it.prod]||0)+it.cant;
+    const g = it.servicio ? it.cant*it.precio : it.cant*(it.precio - costoUnitProd(it.prod, it.variante));
+    profitProd[it.prod]=(profitProd[it.prod]||0)+g;
+  }));
+  return { total, ganancia, count:ventas.length, clis, prods, profitProd, fiados };
 }
 
 let _rep = { lbl:'', desde:'', hasta:'' };
@@ -2932,6 +2965,43 @@ function renderInforme() {
       <div style="font-size:.72em;color:var(--muted);margin-top:3px">vs ${esc(lbl2)}</div>
     </div>` : ''}
 
+    ${DB.config.verGanancias!==false && hayDatosCosto() ? (()=>{
+      const margen = e1.total>0 ? Math.round(e1.ganancia/e1.total*100) : 0;
+      return `<div class="card">
+        <div class="card-title">💵 Ganancia · ${esc(lbl1)}</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="flex:1">
+            <div style="font-size:1.5em;font-weight:800;color:${e1.ganancia>=0?'var(--green)':'var(--red)'}">${fmt(e1.ganancia)}</div>
+            <div style="font-size:.76em;color:var(--muted);margin-top:2px">Ventas ${fmt(e1.total)} − costo ${fmt(e1.total-e1.ganancia)}</div>
+          </div>
+          <div style="text-align:center;flex-shrink:0">
+            <div style="font-size:1.3em;font-weight:800;color:var(--accent)">${margen}%</div>
+            <div style="font-size:.7em;color:var(--muted)">margen</div>
+          </div>
+        </div>
+      </div>`;
+    })() : ''}
+
+    ${(()=>{
+      const meta = +DB.config.metaMensual || 0;
+      if (meta <= 0) return '';
+      const [ml, md] = mesActual();
+      const vendidoMes = ventasRango(ml, md).reduce((s,v)=>s+neto(v),0);
+      const pct = Math.min(100, Math.round(vendidoMes/meta*100));
+      const falta = Math.max(0, meta - vendidoMes);
+      return `<div class="card">
+        <div class="card-title">🎯 Meta del mes</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+          <span style="font-weight:800;font-size:1.1em;color:${pct>=100?'var(--green)':'var(--text)'}">${fmt(vendidoMes)}</span>
+          <span style="font-size:.8em;color:var(--muted)">de ${fmt(meta)}</span>
+        </div>
+        <div class="bar-wrap" style="height:12px"><div class="bar-fill" style="width:${pct}%;background:${pct>=100?'var(--green)':'linear-gradient(90deg,var(--accent),var(--accent2))'}"></div></div>
+        <div style="text-align:center;font-size:.8em;color:var(--muted);margin-top:6px">
+          ${pct>=100 ? '🎉 ¡Meta alcanzada!' : `${pct}% · faltan <b style="color:var(--text)">${fmt(falta)}</b>`}
+        </div>
+      </div>`;
+    })()}
+
     <!-- Gráfico 7 días -->
     <div class="card">
       <div class="card-title">Últimos 7 días · ${fmt(weekTotal)}</div>
@@ -2966,6 +3036,23 @@ function renderInforme() {
         <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;background:var(--sfc2);border:1px solid var(--border);border-radius:2px;display:inline-block"></span>${esc(lbl2)}</span>
       </div>
     </div>` : ''}
+
+    <!-- Productos más rentables -->
+    ${DB.config.verGanancias!==false && hayDatosCosto() ? (()=>{
+      const rent = Object.entries(e1.profitProd||{}).filter(([,g])=>g>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      if (!rent.length) return '';
+      const maxR = Math.max(1, ...rent.map(([,g])=>g));
+      return `<div class="card">
+        <div class="card-title">🏆 Productos más rentables · ${esc(lbl1)}</div>
+        ${rent.map(([p,g],i)=>`
+          <div style="margin-bottom:9px">
+            <div style="display:flex;justify-content:space-between;font-size:.82em;margin-bottom:3px">
+              <span>${i+1}. ${esc(p)}</span><span style="color:var(--green);font-weight:700">${fmt(g)}</span>
+            </div>
+            <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(g/maxR*100)}%;background:linear-gradient(90deg,var(--accent),var(--green))"></div></div>
+          </div>`).join('')}
+      </div>`;
+    })() : ''}
 
     <!-- Top clientes -->
     ${topCli.length ? `
@@ -3073,6 +3160,28 @@ function renderAjustes() {
       <div class="card-title">Moneda</div>
       <input type="text" maxlength="5" placeholder="$" value="${esc(DB.config.moneda)}"
         oninput="DB.config.moneda=this.value;guardar()">
+    </div>
+
+    <!-- Metas y ganancias -->
+    <div class="card">
+      <div class="card-title">🎯 Metas y ganancias</div>
+      <div style="margin-bottom:11px">
+        <label class="input-label">Meta de ventas del mes</label>
+        <input type="number" inputmode="decimal" min="0" placeholder="Ej: 5000000" value="${DB.config.metaMensual||''}"
+          oninput="DB.config.metaMensual=+this.value||0;guardar()">
+        <div class="ajuste-sub">Se muestra con barra de progreso en el Informe.</div>
+      </div>
+      <div class="ajuste-row">
+        <div>
+          <div class="ajuste-lbl">Mostrar ganancias</div>
+          <div class="ajuste-sub">Calcula ganancia y margen usando tus costos</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${DB.config.verGanancias!==false?'checked':''}
+            onchange="DB.config.verGanancias=this.checked;guardar();toast(this.checked?'Ganancias visibles':'Ganancias ocultas')">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
     </div>
 
     <!-- Apariencia -->
@@ -5086,6 +5195,56 @@ function _freqProd(n) {
     if (it.prod) freq[it.prod] = (freq[it.prod]||0) + 1;
   }));
   return freq;
+}
+
+// Panel inteligente: acciones sugeridas para hoy (stock bajo, deudas viejas, clientes inactivos)
+function panelInteligente() {
+  const alertas = [];
+
+  // 1) Stock bajo / agotado
+  const bajos = DB.productos.filter(p => { const s = stockActual(p); return s > 0 && s <= 3; });
+  const agotados = DB.productos.filter(p => (DB.entradas||[]).some(e=>e.prod===p) && stockActual(p) <= 0);
+  if (agotados.length) {
+    alertas.push({ ico:'🚫', txt:`<b>${esc(agotados[0])}</b>${agotados.length>1?` y ${agotados.length-1} más`:''} sin stock`, col:'var(--red)', act:`goTo('inventario')` });
+  } else if (bajos.length) {
+    alertas.push({ ico:'⚠️', txt:`<b>${esc(bajos[0])}</b>${bajos.length>1?` y ${bajos.length-1} más`:''} por agotarse`, col:'var(--warn)', act:`goTo('inventario')` });
+  }
+
+  // 2) Deuda más antigua sin cobrar
+  const deudores = {};
+  DB.ventas.filter(v=>v.pago==='fiado'&&!v.fiadoPagado&&montoPendienteV(v)>0).forEach(v=>{
+    if (!deudores[v.cliente] || v.ts < deudores[v.cliente].ts) deudores[v.cliente] = { ts:v.ts, monto:0 };
+  });
+  Object.keys(deudores).forEach(n => { deudores[n].monto = deudaClienteTotal(n); });
+  const deudaVieja = Object.entries(deudores).sort((a,b)=>a[1].ts-b[1].ts)[0];
+  if (deudaVieja) {
+    const dias = Math.floor((Date.now() - deudaVieja[1].ts) / 864e5);
+    if (dias >= 3) {
+      alertas.push({ ico:'📋', txt:`<b>${esc(deudaVieja[0])}</b> debe ${fmt(deudaVieja[1].monto)} hace ${dias} día${dias!==1?'s':''}`, col:'var(--red)', act:`recordarDeudaWA('${esc(deudaVieja[0])}')` });
+    }
+  }
+
+  // 3) Cliente frecuente que dejó de comprar
+  const ultimaCompra = {};
+  DB.ventas.forEach(v => { if (v.cliente && v.cliente!=='Sin nombre') { if (!ultimaCompra[v.cliente] || v.ts > ultimaCompra[v.cliente].ts) ultimaCompra[v.cliente] = { ts:v.ts, count:0 }; ultimaCompra[v.cliente].count++; } });
+  const inactivos = Object.entries(ultimaCompra)
+    .filter(([,d]) => d.count >= 3 && (Date.now()-d.ts)/864e5 >= 15)
+    .sort((a,b)=>a[1].ts-b[1].ts);
+  if (inactivos.length) {
+    const dias = Math.floor((Date.now()-inactivos[0][1].ts)/864e5);
+    alertas.push({ ico:'😴', txt:`<b>${esc(inactivos[0][0])}</b> no compra hace ${dias} días`, col:'var(--muted)', act:`verCliente('${esc(inactivos[0][0])}')` });
+  }
+
+  if (!alertas.length) return '';
+  return `<div class="card" style="border-left:3px solid var(--accent);margin-bottom:12px">
+    <div style="font-size:.72em;font-weight:700;color:var(--accent);letter-spacing:.05em;margin-bottom:7px">⚡ PARA HOY</div>
+    ${alertas.slice(0,3).map(a=>`
+      <div onclick="${a.act}" style="display:flex;align-items:center;gap:9px;padding:7px 0;cursor:pointer;border-bottom:1px solid var(--border)">
+        <span style="font-size:1.1em">${a.ico}</span>
+        <span style="flex:1;font-size:.84em;color:${a.col}">${a.txt}</span>
+        <span style="color:var(--muted);font-size:.9em">›</span>
+      </div>`).join('')}
+  </div>`;
 }
 
 // AI insights card for Hoy page
