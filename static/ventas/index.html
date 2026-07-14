@@ -606,6 +606,9 @@ body.offline .offline-badge{display:inline}
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('documentos')">
         <span class="mas-ico">📷</span><span class="mas-lbl">Documentos</span>
       </button>
+      <button class="mas-btn" onclick="closeModal('m-mas');goTo('sugerencias')">
+        <span class="mas-ico">💡</span><span class="mas-lbl">Sugerencias</span>
+      </button>
       <button class="mas-btn" onclick="closeModal('m-mas');goTo('cotizaciones')">
         <span class="mas-ico">📄</span><span class="mas-lbl">Cotizaciones</span>
       </button>
@@ -1283,7 +1286,7 @@ function mesPasado()  {
 // ═══════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════
-const MAS_PAGES = ['clientes','devol','ajustes','inventario','documentos','productos','compras','cotizaciones','movimientos'];
+const MAS_PAGES = ['clientes','devol','ajustes','inventario','documentos','productos','compras','cotizaciones','movimientos','sugerencias'];
 
 function goTo(p, pushHistory=true) {
   leerFormVenta();
@@ -5679,6 +5682,186 @@ function renderMovimientos() {
     <div class="card"><div class="card-title">Historial reciente</div>${lista}</div>`;
 }
 
+// ═══════════════════════════════════════════════════════════
+// SUGERENCIAS · asistente de ventas basado en tus datos
+// ═══════════════════════════════════════════════════════════
+function ventasUltimosDias(n) {
+  const lim = Date.now() - n*864e5;
+  return DB.ventas.filter(v => (v.ts || new Date((v.fecha||'')+'T12:00:00').getTime()) >= lim);
+}
+
+function analizarSugerencias() {
+  const sug = [];
+  const v30 = ventasUltimosDias(30);
+
+  // Estadística por producto (30 días)
+  const stat = {};
+  v30.forEach(v => v.items.forEach(it => {
+    if (it.servicio) return;
+    const s = stat[it.prod] || (stat[it.prod] = { gan:0, uni:0, ing:0, ultTs:0 });
+    const costo = costoUnitProd(it.prod, it.variante);
+    s.gan += it.cant*(it.precio-costo);
+    s.uni += it.cant;
+    s.ing += it.cant*it.precio;
+    s.ultTs = Math.max(s.ultTs, v.ts||0);
+  }));
+  const prods = Object.entries(stat);
+  const hayCosto = hayDatosCosto();
+
+  // 1) Producto más rentable → concéntrate aquí
+  if (prods.length && hayCosto) {
+    const top = prods.slice().sort((a,b)=>b[1].gan-a[1].gan)[0];
+    if (top[1].gan > 0)
+      sug.push({ tono:'good', ico:'🏆', titulo:'Concéntrate en este producto',
+        texto:`<b>${esc(top[0])}</b> es tu mina de oro: <b>${fmt(top[1].gan)}</b> de ganancia en 30 días. Tenlo siempre en stock y ofrécelo de primero.` });
+  } else if (prods.length) {
+    const top = prods.slice().sort((a,b)=>b[1].ing-a[1].ing)[0];
+    sug.push({ tono:'good', ico:'🏆', titulo:'Tu producto más vendido',
+      texto:`<b>${esc(top[0])}</b> lidera tus ventas (${fmt(top[1].ing)} en 30 días). Nunca lo dejes agotar.` });
+  }
+
+  // 2) Alto margen pero poca venta → promociónalo
+  if (prods.length >= 3 && hayCosto) {
+    const conMargen = prods.map(([p,s]) => {
+      const precio = (DB.precios||{})[p] || (s.uni? s.ing/s.uni : 0);
+      const costo  = costoUnitProd(p);
+      const margen = precio>0 ? (precio-costo)/precio : 0;
+      return { p, margen, uni:s.uni };
+    }).filter(x=>x.margen>0.28);
+    const medianaUni = prods.map(([,s])=>s.uni).sort((a,b)=>a-b)[Math.floor(prods.length/2)] || 0;
+    const joya = conMargen.filter(x=>x.uni < medianaUni).sort((a,b)=>b.margen-a.margen)[0];
+    if (joya)
+      sug.push({ tono:'opp', ico:'💎', titulo:'Oportunidad desaprovechada',
+        texto:`<b>${esc(joya.p)}</b> deja muy buen margen (<b>${Math.round(joya.margen*100)}%</b>) pero se vende poco. Ponlo en <b>venta rápida</b> y ofrécelo más.`,
+        accion:`⭐ Hacer favorito`, fn:`toggleFavorito('${esc(joya.p)}')` });
+  }
+
+  // 3) Combo frecuente → crea un paquete
+  const pares = {};
+  v30.forEach(v => {
+    const ps = [...new Set(v.items.filter(it=>!it.servicio).map(it=>it.prod))];
+    for (let i=0;i<ps.length;i++) for (let j=i+1;j<ps.length;j++) {
+      const k = [ps[i],ps[j]].sort().join(' + ');
+      pares[k] = (pares[k]||0)+1;
+    }
+  });
+  const topPar = Object.entries(pares).sort((a,b)=>b[1]-a[1])[0];
+  if (topPar && topPar[1] >= 3)
+    sug.push({ tono:'good', ico:'🧺', titulo:'Combo que se vende solo',
+      texto:`<b>${esc(topPar[0])}</b> se compran juntos seguido (${topPar[1]} veces). Crea un <b>combo con descuento</b> y véndelo como paquete.` });
+
+  // 4) Stock parado → oferta para moverlo (clave en embutidos por vencimiento)
+  const parados = DB.productos.map(p => {
+    const st = stockActual(p);
+    if (st <= 0) return null;
+    const ult = (stat[p]?.ultTs) || 0;
+    const dias = ult ? Math.floor((Date.now()-ult)/864e5) : 999;
+    return dias >= 10 ? { p, st, dias } : null;
+  }).filter(Boolean).sort((a,b)=>b.dias-a.dias);
+  if (parados.length) {
+    const x = parados[0];
+    sug.push({ tono:'warn', ico:'⏳', titulo:'Muévelo antes de que se dañe',
+      texto:`Tienes <b>${fmtCant(x.st)}</b> de <b>${esc(x.p)}</b> ${x.dias>900?'sin registrar ventas':'sin venderse hace '+x.dias+' días'}. Lanza una <b>oferta</b> para recuperar esa plata.`,
+      accion:`🔥 Crear oferta`, fn:`crearOferta('${esc(x.p)}')` });
+  }
+
+  // 5) Producto en caída (esta semana vs semana pasada)
+  const uniSemana = (desdeDias, hastaDias) => {
+    const lo = Date.now()-desdeDias*864e5, hi = Date.now()-hastaDias*864e5;
+    const m = {};
+    DB.ventas.forEach(v => { const t=v.ts||0; if (t>=lo && t<hi) v.items.forEach(it=>{ if(!it.servicio) m[it.prod]=(m[it.prod]||0)+it.cant; }); });
+    return m;
+  };
+  const estaSem = uniSemana(7,0), pasadaSem = uniSemana(14,7);
+  let caida = null;
+  Object.keys(pasadaSem).forEach(p => {
+    if (pasadaSem[p] >= 3) {
+      const drop = (pasadaSem[p]-(estaSem[p]||0))/pasadaSem[p];
+      if (drop >= 0.4 && (!caida || drop>caida.drop)) caida = { p, drop };
+    }
+  });
+  if (caida)
+    sug.push({ tono:'warn', ico:'📉', titulo:'Ventas cayendo',
+      texto:`<b>${esc(caida.p)}</b> bajó <b>${Math.round(caida.drop*100)}%</b> esta semana. Revisa el precio, la calidad o promociónalo con una oferta.`,
+      accion:`🔥 Crear oferta`, fn:`crearOferta('${esc(caida.p)}')` });
+
+  // 6) Mejor día de la semana → asegura stock
+  const porDia = [0,0,0,0,0,0,0], cntDia=[0,0,0,0,0,0,0];
+  ventasUltimosDias(60).forEach(v => { const d=new Date(v.ts||Date.now()).getDay(); porDia[d]+=neto(v); cntDia[d]++; });
+  if (ventasUltimosDias(60).length >= 8) {
+    const nombres=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    const mejor = porDia.map((t,i)=>[i,t]).sort((a,b)=>b[1]-a[1])[0];
+    if (mejor[1]>0)
+      sug.push({ tono:'good', ico:'📅', titulo:'Tu mejor día',
+        texto:`Los <b>${nombres[mejor[0]]}</b> vendes más (${fmt(mejor[1])} acumulado). Asegura stock completo y tus favoritos ese día.` });
+  }
+
+  // 7) Margen muy bajo → sube el precio
+  if (hayCosto && prods.length) {
+    const bajo = prods.map(([p,s]) => {
+      const precio=(DB.precios||{})[p]||(s.uni?s.ing/s.uni:0), costo=costoUnitProd(p);
+      const margen = precio>0?(precio-costo)/precio:1;
+      return { p, margen, uni:s.uni };
+    }).filter(x=>x.margen>0 && x.margen<0.12 && x.uni>=3).sort((a,b)=>a.margen-b.margen)[0];
+    if (bajo)
+      sug.push({ tono:'opp', ico:'⬆️', titulo:'Te queda poca ganancia aquí',
+        texto:`<b>${esc(bajo.p)}</b> se vende bien pero deja solo <b>${Math.round(bajo.margen*100)}%</b> de margen. Considera subir un poco el precio o negociar mejor la compra.` });
+  }
+
+  // 8) Cliente estrella → fidelízalo
+  const cliGan = {};
+  v30.forEach(v => { if (v.cliente && v.cliente!=='Sin nombre') cliGan[v.cliente]=(cliGan[v.cliente]||0)+neto(v); });
+  const topCli = Object.entries(cliGan).sort((a,b)=>b[1]-a[1])[0];
+  if (topCli && topCli[1] > 0)
+    sug.push({ tono:'good', ico:'⭐', titulo:'Cuida a tu mejor cliente',
+      texto:`<b>${esc(topCli[0])}</b> es quien más te compra (${fmt(topCli[1])} en 30 días). Dale un detalle o precio especial para que no se vaya.`,
+      accion:`💬 Escribirle`, fn:`escribirWA('${esc(topCli[0])}')` });
+
+  return sug;
+}
+
+function renderSugerencias() {
+  const sug = analizarSugerencias();
+  const totalVentas = DB.ventas.length;
+
+  const tonoCol = { good:'var(--green)', opp:'var(--accent)', warn:'var(--warn)' };
+
+  const cuerpo = sug.length ? sug.map((s,i)=>`
+    <div class="card" style="border-left:3px solid ${tonoCol[s.tono]||'var(--accent)'};margin-bottom:10px;animation:cardRise .4s cubic-bezier(.22,.61,.36,1) both;animation-delay:${i*0.04}s">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:1.5em;line-height:1">${s.ico}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:750;font-size:.9em;margin-bottom:3px;color:${tonoCol[s.tono]}">${esc(s.titulo)}</div>
+          <div style="font-size:.85em;color:var(--text);line-height:1.5">${s.texto}</div>
+          ${s.accion?`<button class="btn-sm" style="margin-top:9px;background:${tonoCol[s.tono]==='var(--warn)'?'rgba(210,153,34,.15)':tonoCol[s.tono]==='var(--green)'?'var(--gdim)':'var(--adim)'};color:${tonoCol[s.tono]};border:1px solid ${tonoCol[s.tono]}" onclick="${s.fn}">${esc(s.accion)}</button>`:''}
+        </div>
+      </div>
+    </div>`).join('')
+    : `<div class="empty"><div class="empty-ico">💡</div>${totalVentas<5?'Registra más ventas para recibir sugerencias personalizadas':'Todo marcha bien — sin alertas por ahora'}</div>`;
+
+  return `
+    <button class="back-btn" onclick="history.back()">← Volver</button>
+    <div class="section-title">💡 Sugerencias para ti ${sug.length?`<span class="badge">${sug.length}</span>`:''}</div>
+    <div style="background:var(--adim);border:1px solid rgba(68,147,248,.2);border-radius:var(--radius);padding:10px 13px;margin-bottom:12px;font-size:.8em;color:var(--muted);line-height:1.5">
+      🤖 Analizado con tus ventas de los últimos 30 días. Se actualiza solo a medida que vendes.
+    </div>
+    ${cuerpo}`;
+}
+
+// Crear una oferta: calcula un precio promocional y lo comparte por WhatsApp
+function crearOferta(prod) {
+  const base  = (DB.precios||{})[prod] || ultimoPrecio(prod) || 0;
+  const costo = costoUnitProd(prod);
+  if (base <= 0) { toast('Asigna un precio de venta a este producto primero', true); return; }
+  let promo = Math.round(base * 0.9 / 100) * 100;           // 10% menos, redondeado a 100
+  if (costo > 0 && promo < costo * 1.05) promo = Math.round(costo * 1.05); // nunca bajo el costo
+  const u   = DB.unidades[prod] ? '/'+DB.unidades[prod] : '';
+  const neg = DB.config.negocio || 'Mi Negocio';
+  const txt = `🔥 ¡OFERTA ESPECIAL! 🔥\n\n${prod}\nAntes ${fmt(base)}${u}  ➡️  AHORA ${fmt(promo)}${u}\n\n${neg}\n📲 Pide el tuyo. ¡Stock limitado!`;
+  if (navigator.share) navigator.share({ text: txt, title: 'Oferta' }).catch(()=>mostrarExport(txt));
+  else mostrarExport(txt);
+}
+
 // Cierre de caja: resumen del día listo para compartir/imprimir
 function cierreCaja() {
   const h = hoy();
@@ -5829,9 +6012,10 @@ function render() {
   else if (paginaActual==='compras')     app.innerHTML = renderCompras();
   else if (paginaActual==='cotizaciones')app.innerHTML = renderCotizaciones();
   else if (paginaActual==='movimientos') app.innerHTML = renderMovimientos();
+  else if (paginaActual==='sugerencias') app.innerHTML = renderSugerencias();
   actualizarHeaderTotal();
   const fab = document.getElementById('calc-fab');
-  if (fab) fab.style.display = ['ajustes','inventario','documentos','clientes','productos','compras','cotizaciones','movimientos'].includes(paginaActual) ? 'none' : 'flex';
+  if (fab) fab.style.display = ['ajustes','inventario','documentos','clientes','productos','compras','cotizaciones','movimientos','sugerencias'].includes(paginaActual) ? 'none' : 'flex';
   requestAnimationFrame(()=>app.classList.add('page-in'));
 }
 
