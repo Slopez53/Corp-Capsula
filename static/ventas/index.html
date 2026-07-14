@@ -683,7 +683,7 @@ body.offline .offline-badge{display:inline}
       <option value="paq">Paquete (paq)</option>
       <option value="unid">Unidad (unid)</option>
     </select>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px">
       <div>
         <div class="compra-price-lbl">💸 Costo</div>
         <input type="number" min="0" inputmode="decimal" id="np-costo" placeholder="0" style="padding:8px 7px;font-size:.86em;text-align:right">
@@ -697,6 +697,9 @@ body.offline .offline-badge{display:inline}
         <input type="number" min="0" inputmode="decimal" id="np-detal" placeholder="0" style="padding:8px 7px;font-size:.86em;text-align:right;border-color:var(--green)">
       </div>
     </div>
+    <input type="hidden" id="np-barcode-val" value="">
+    <button class="btn btn-surface" onclick="abrirEscaner('asignar')" style="margin-bottom:8px;font-size:.85em">📷 Escanear código de barras</button>
+    <div id="np-barcode-lbl" style="font-size:.78em;color:var(--muted);text-align:center;margin-bottom:14px"></div>
     <button class="btn btn-primary" onclick="guardarNuevoProducto()">✅ Agregar producto</button>
   </div>
 </div>
@@ -790,6 +793,22 @@ body.offline .offline-badge{display:inline}
     <button class="modal-close" onclick="cancelarDocEditor()">✕</button>
     <div class="modal-title">✂️ Editar y guardar imagen</div>
     <div id="m-doc-editor-body"></div>
+  </div>
+</div>
+
+<!-- Modal: escáner de código de barras -->
+<div class="modal-bg" id="m-scan" onclick="if(event.target===event.currentTarget)cerrarEscaner()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="cerrarEscaner()">✕</button>
+    <div class="modal-title" id="m-scan-title">📷 Escanear código</div>
+    <div style="position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:4/3">
+      <video id="scan-video" playsinline muted style="width:100%;height:100%;object-fit:cover;display:block"></video>
+      <div style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
+        <div style="width:78%;height:34%;border:2px solid rgba(255,255,255,.85);border-radius:12px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35)"></div>
+      </div>
+    </div>
+    <div id="scan-status" style="text-align:center;font-size:.82em;color:var(--muted);margin-top:10px">Apunta al código de barras…</div>
   </div>
 </div>
 
@@ -953,6 +972,7 @@ let DB = {
   gastos:       [],
   ingresos:     [],
   cotizaciones: [],
+  barcodes:     {},
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1034,6 +1054,7 @@ function cargar() {
     DB.gastos       = Array.isArray(p.gastos)       ? p.gastos       : [];
     DB.ingresos     = Array.isArray(p.ingresos)     ? p.ingresos     : [];
     DB.cotizaciones = Array.isArray(p.cotizaciones) ? p.cotizaciones : [];
+    DB.barcodes     = (p.barcodes && typeof p.barcodes==='object') ? p.barcodes : {};
     DB.config    = { ...DB.config, ...(p.config||{}) };
     DB.ventas.forEach((v,i) => {
       if (!v.numRecibo) v.numRecibo = i+1;
@@ -1160,7 +1181,10 @@ function bgClose(e,id)  { if (e.target===e.currentTarget) closeModal(id); }
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const open = document.querySelector('.modal-bg.open:not(#m-doc-editor)');
-    if (open) { open.classList.remove('open'); return; }
+    if (open) {
+      if (open.id === 'm-scan' && typeof cerrarEscaner === 'function') { cerrarEscaner(); return; }
+      open.classList.remove('open'); return;
+    }
   }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
     if (e.key === 'k') { e.preventDefault(); abrirBusqueda(); return; }
@@ -1540,6 +1564,9 @@ function renderVenta() {
         </button>
         <button class="btn btn-surface" style="flex:1;font-size:.86em;color:var(--accent2)" onclick="agregarServicio()">
           🔧 Servicio
+        </button>
+        <button class="btn btn-surface" style="flex:0 0 auto;font-size:.86em;padding:12px 14px" onclick="abrirEscaner('venta')" title="Escanear código">
+          📷
         </button>
       </div>
     </div>
@@ -4229,10 +4256,13 @@ function borrarDoc(id) {
 // REGISTRO DE PRODUCTOS
 // ═══════════════════════════════════════════════════════════
 function renderProductos() {
-  const prodList = DB.productos.map((p, i) => `
+  const prodList = DB.productos.map((p, i) => {
+    const tieneBarcode = Object.values(DB.barcodes||{}).includes(p);
+    return `
     <div class="prod-page-item" data-nombre="${esc(p)}" style="flex-direction:column;align-items:stretch;gap:8px">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="flex:1;font-weight:600">${esc(p)}</span>
+        <button class="btn-sm" style="background:${tieneBarcode?'var(--gdim)':'var(--sfc2)'};color:${tieneBarcode?'var(--green)':'var(--muted)'};border:1px solid var(--border)" onclick="asignarBarcode('${esc(p)}')" title="${tieneBarcode?'Código asignado':'Asignar código de barras'}">📷</button>
         <select class="unit-select" data-prod="${esc(p)}" onchange="setUnidadEvt(this)" style="width:68px">
           <option value="">unid.</option>
           ${['lb','kg','gr','paq','unid'].map(u=>`<option value="${u}"${DB.unidades[p]===u?' selected':''}>${u}</option>`).join('')}
@@ -4262,7 +4292,8 @@ function renderProductos() {
             oninput="setPrecioPie(${i},this.value)">
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   return `
     <div class="section-title">📦 Registro de Productos <span class="badge">${DB.productos.length}</span></div>
@@ -4297,6 +4328,9 @@ function abrirNuevoProducto() {
   document.getElementById('np-costo').value  = '';
   document.getElementById('np-venta').value  = '';
   document.getElementById('np-detal').value  = '';
+  document.getElementById('np-barcode-val').value = '';
+  const lbl = document.getElementById('np-barcode-lbl');
+  if (lbl) { lbl.textContent = ''; lbl.style.color = 'var(--muted)'; }
   openModal('m-nuevo-prod');
   setTimeout(()=>document.getElementById('np-nombre')?.focus(), 150);
 }
@@ -4309,15 +4343,24 @@ function guardarNuevoProducto() {
   const costo  = +document.getElementById('np-costo').value || 0;
   const venta  = +document.getElementById('np-venta').value || 0;
   const detal  = +document.getElementById('np-detal').value || 0;
+  const code   = document.getElementById('np-barcode-val').value.trim();
   DB.productos.push(n);
   if (unidad)   DB.unidades[n]      = unidad;
   if (costo>0)  DB.preciosCompra[n] = costo;
   if (venta>0)  DB.precios[n]       = venta;
   if (detal>0)  DB.preciosPie[n]    = detal;
+  if (code)   { if (!DB.barcodes) DB.barcodes = {}; DB.barcodes[code] = n; }
   guardar(); vibrar();
   closeModal('m-nuevo-prod');
   toast('📦 ' + n + ' agregado');
   if (paginaActual === 'productos') render();
+}
+
+// Asignar un código de barras a un producto existente (desde la lista de productos)
+let _asignBarcodeProd = '';
+function asignarBarcode(prod) {
+  _asignBarcodeProd = prod;
+  abrirEscaner('asignar-existente');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5245,6 +5288,107 @@ function panelInteligente() {
         <span style="color:var(--muted);font-size:.9em">›</span>
       </div>`).join('')}
   </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ESCÁNER DE CÓDIGO DE BARRAS (BarcodeDetector nativo)
+// ═══════════════════════════════════════════════════════════
+let _scanStream = null, _scanRAF = null, _scanCb = null, _scanBusy = false, _scanLoop = null;
+
+function abrirEscaner(modo) {
+  _scanCb = modo;
+  if (!('BarcodeDetector' in window)) {
+    toast('Tu navegador no soporta escáner. Usa Chrome en Android.', true);
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) { toast('Cámara no disponible', true); return; }
+  const titulo = document.getElementById('m-scan-title');
+  if (titulo) titulo.textContent = modo==='asignar' ? '📷 Asignar código a producto' : '📷 Escanear producto';
+  const status = document.getElementById('scan-status');
+  if (status) status.textContent = 'Iniciando cámara…';
+  openModal('m-scan');
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(stream => {
+      _scanStream = stream;
+      const vid = document.getElementById('scan-video');
+      vid.srcObject = stream;
+      vid.play();
+      if (status) status.textContent = 'Apunta al código de barras…';
+      const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','codabar','itf'] });
+      _scanLoop = async () => {
+        if (!_scanStream) return;
+        if (!_scanBusy && vid.readyState === 4) {
+          _scanBusy = true;
+          try {
+            const codes = await detector.detect(vid);
+            if (codes && codes.length) { onCodigoDetectado(codes[0].rawValue); return; }
+          } catch(e) {}
+          _scanBusy = false;
+        }
+        _scanRAF = requestAnimationFrame(_scanLoop);
+      };
+      _scanRAF = requestAnimationFrame(_scanLoop);
+    })
+    .catch(() => { if (status) status.textContent = 'No se pudo abrir la cámara'; toast('Permiso de cámara denegado', true); });
+}
+
+function cerrarEscaner() {
+  if (_scanRAF) cancelAnimationFrame(_scanRAF);
+  _scanRAF = null; _scanLoop = null;
+  if (_scanStream) { _scanStream.getTracks().forEach(t=>t.stop()); _scanStream = null; }
+  _scanBusy = false;
+  const vid = document.getElementById('scan-video');
+  if (vid) vid.srcObject = null;
+  closeModal('m-scan');
+}
+
+function onCodigoDetectado(code) {
+  if (DB.config.haptics !== false) try { navigator.vibrate(60); } catch(e){}
+  const prod = (DB.barcodes||{})[code];
+  if (_scanCb === 'asignar') {
+    cerrarEscaner();
+    if (prod) { toast('Ese código ya es de: ' + prod, true); return; }
+    document.getElementById('np-barcode-val').value = code;
+    const lbl = document.getElementById('np-barcode-lbl');
+    if (lbl) { lbl.textContent = '✅ Código: ' + code; lbl.style.color = 'var(--green)'; }
+    toast('📷 Código capturado');
+    return;
+  }
+  if (_scanCb === 'asignar-existente') {
+    cerrarEscaner();
+    if (prod && prod !== _asignBarcodeProd) { toast('Ese código ya es de: ' + prod, true); return; }
+    if (!DB.barcodes) DB.barcodes = {};
+    DB.barcodes[code] = _asignBarcodeProd;
+    guardar();
+    toast('✅ Código asignado a ' + _asignBarcodeProd);
+    if (paginaActual === 'productos') render();
+    return;
+  }
+  // Modo venta: agregar producto a la venta
+  if (prod) {
+    cerrarEscaner();
+    agregarProductoVenta(prod);
+    toast('✅ ' + prod + ' agregado');
+  } else {
+    // Código no registrado: avisar y seguir escaneando
+    const status = document.getElementById('scan-status');
+    if (status) status.innerHTML = '<span style="color:var(--warn)">Código no registrado: '+esc(code)+'</span><br>Regístralo en Productos 📦';
+    setTimeout(() => {
+      _scanBusy = false;
+      if (_scanStream && _scanLoop) _scanRAF = requestAnimationFrame(_scanLoop);
+    }, 1200);
+  }
+}
+
+// Agrega un producto (por nombre) a la venta actual, con su precio por defecto
+function agregarProductoVenta(prod) {
+  const precio = (DB.precios||{})[prod] || ultimoPrecio(prod) || '';
+  // ¿ya existe una fila vacía? úsala
+  const vacia = vF.items.findIndex(it => !it.prod);
+  if (vacia >= 0) vF.items[vacia] = { prod, cant:1, precio, custom:false };
+  else vF.items.push({ prod, cant:1, precio, custom:false });
+  if (paginaActual !== 'venta') goTo('venta');
+  else { refrescarFilas(); calcTotal(); }
 }
 
 // AI insights card for Hoy page
