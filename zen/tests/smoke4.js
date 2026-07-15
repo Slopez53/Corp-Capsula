@@ -9,7 +9,7 @@ const { chromium } = require('playwright-core');
   await page.waitForTimeout(900);
 
   await page.click('nav button[data-view="mind"]');
-  console.log('reto inicial:', (await page.textContent('#retoBody')).includes('Iniciar reto') ? 'OK' : 'FALLO');
+  console.log('reto inicial:', (await page.textContent('#retoBody')).includes('Comenzar mi reto') ? 'OK' : 'FALLO');
   console.log('gráfico placeholder + nivel 1:', await page.textContent('#pgLvl') === '1' ? 'OK' : 'FALLO');
 
   // Iniciar reto

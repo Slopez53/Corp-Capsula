@@ -369,7 +369,7 @@
       <div id="mindHome">
         <p id="tip"></p>
         <div class="glass" style="padding:18px 20px">
-          <h2>Reto 30 días</h2>
+          <h2>Mi reto</h2>
           <div id="retoBody"></div>
         </div>
         <div class="glass" style="padding:18px 20px">
@@ -380,7 +380,9 @@
             <div class="stat"><b id="pgLvl">1</b><span>nivel</span></div>
             <div class="stat"><b id="pgSes">0</b><span>días entrenados</span></div>
           </div>
-          <div style="height:10px"></div>
+          <h2 style="margin-top:18px">Logros</h2>
+          <div class="gchips" id="badges"></div>
+          <div style="height:12px"></div>
           <button class="btn ghost small" id="reportBtn">Ver informe</button>
         </div>
         <button class="gameCard" data-game="react">
@@ -1510,18 +1512,43 @@ function recordScore(game, val, dir) {
   renderMind();
   checkDailyCompletion(r);
 }
+/* Los ejercicios que exige el reto activo (todos, si no hay reto o es antiguo) */
+function activeGames() {
+  const ch = mind.challenge;
+  return ch && ch.games && ch.games.length ? ch.games : MIND_GAMES;
+}
+function trainStreak() {
+  const set = new Set(mind.hist.filter(h => h.idx != null).map(h => h.d));
+  const key = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  let n = 0;
+  const d = new Date();
+  if (!set.has(key(d))) d.setDate(d.getDate() - 1);
+  while (set.has(key(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+const BADGES = [
+  { e: "🌱", n: "Primer día",        ok: () => mind.hist.some(h => h.idx != null) },
+  { e: "🔥", n: "3 días seguidos",   ok: () => trainStreak() >= 3 },
+  { e: "⚡", n: "7 días seguidos",   ok: () => trainStreak() >= 7 },
+  { e: "🧠", n: "Nivel 5",           ok: () => mind.level + 1 >= 5 },
+  { e: "🚀", n: "Nivel 10",          ok: () => mind.level + 1 >= 10 },
+  { e: "📅", n: "30 días entrenados", ok: () => mind.hist.filter(h => h.idx != null).length >= 30 },
+  { e: "🏆", n: "Reto completado",   ok: () => (mind.completedCh || 0) >= 1 }
+];
 function checkDailyCompletion(r) {
-  if (!MIND_GAMES.every(k => r.g[k] !== undefined)) return;
+  if (!activeGames().every(k => r.g[k] !== undefined)) return;
   const today = todayKey();
   const ch = mind.challenge;
-  const isNewChDay = ch && ch.days.length < 30 && !ch.days.includes(today);
+  const len = ch ? (ch.len || 30) : 30;
+  const isNewChDay = ch && ch.days.length < len && !ch.days.includes(today);
   if (isNewChDay) ch.days.push(today);
   if (mind.lastLevelDay !== today) {
     mind.lastLevelDay = today;
+    const pace = ch && ch.pace ? ch.pace : 1;
     const prev = mind.hist.filter(h => h.d !== today && h.idx != null).slice(-3);
     const avg = prev.length ? prev.reduce((s, h) => s + h.idx, 0) / prev.length : -1;
     if (avg < 0 || r.idx >= avg) {
-      mind.level++;
+      mind.level += pace;
       toast(`¡Sesión completa! La dificultad sube al nivel ${mind.level + 1} 📈`, 4200);
     } else if (r.idx < avg * 0.7) {
       mind.level = Math.max(0, mind.level - 1);
@@ -1533,40 +1560,93 @@ function checkDailyCompletion(r) {
   }
   saveMind(); renderMind();
   if (isNewChDay) {
-    if (ch.days.length >= 30) toast("🏆 ¡Reto de 30 días completado!", 5000);
+    if (ch.days.length >= len) {
+      mind.completedCh = (mind.completedCh || 0) + 1;
+      saveMind(); renderMind();
+      toast(`🏆 ¡Reto de ${len} días completado!`, 5000);
+    }
     setTimeout(() => { buildReport(); showGame("report"); }, 1300);
   }
 }
+/* Constructor de retos personalizados */
+const retoCfg = { len: 30, games: [...MIND_GAMES], lvl: 0, pace: 1 };
+let retoQuitArm = 0;
 function renderReto() {
   const el = $("retoBody"), ch = mind.challenge;
+  const S = (b) => b ? " sel" : "";
   if (!ch) {
-    el.innerHTML = `<p class="note" style="margin-top:0">Completa los 5 ejercicios cada día durante 30 días. La dificultad crece de forma exponencial con tu rendimiento, y cada sesión completa genera un informe.</p>
-      <div style="height:12px"></div><button class="btn small" id="retoStart">Iniciar reto de 30 días</button>`;
+    el.innerHTML = `
+      <p class="note" style="margin-top:0">Diseña tu propio reto: días, ejercicios y dificultad inicial. A partir de ahí la dificultad sube sola según tu rendimiento.</p>
+      <h2 style="margin-top:14px">Duración</h2>
+      <div class="chips">${[7, 14, 21, 30].map(d => `<button class="chip${S(retoCfg.len === d)}" data-rlen="${d}">${d} días</button>`).join("")}</div>
+      <h2 style="margin-top:14px">Ejercicios diarios (${retoCfg.games.length})</h2>
+      <div class="chips">${MIND_GAMES.map(g => `<button class="chip${S(retoCfg.games.includes(g))}" data-rgame="${g}">${GAME_META[g].ico} ${GAME_META[g].n}</button>`).join("")}</div>
+      <h2 style="margin-top:14px">Dificultad inicial</h2>
+      <div class="chips">${[["Suave", 0], ["Media", 4], ["Alta", 9], ["Extrema", 14]].map(([n, l]) => `<button class="chip${S(retoCfg.lvl === l)}" data-rlvl="${l}">${n}</button>`).join("")}</div>
+      <h2 style="margin-top:14px">Progresión</h2>
+      <div class="chips">
+        <button class="chip${S(retoCfg.pace === 1)}" data-rpace="1">Gradual · +1 nivel</button>
+        <button class="chip${S(retoCfg.pace === 2)}" data-rpace="2">Intensa · +2 niveles</button>
+      </div>
+      <div style="height:14px"></div>
+      <button class="btn small" id="retoStart">Comenzar mi reto de ${retoCfg.len} días</button>`;
     return;
   }
+  const len = ch.len || 30, games = activeGames();
   const done = ch.days.length, today = todayKey();
-  if (done >= 30) {
-    el.innerHTML = `<p style="font-size:15px">🏆 <b>Reto completado</b> — 30 días de entrenamiento. Tu cerebro lo nota.</p>
+  if (done >= len) {
+    el.innerHTML = `<p style="font-size:15px">🏆 <b>Reto de ${len} días completado.</b> Tu cerebro lo nota.</p>
       <div class="pbar"><i style="width:100%"></i></div>
-      <div style="height:8px"></div><button class="btn small" id="retoStart">Empezar un nuevo reto</button>`;
+      <div style="height:8px"></div><button class="btn small" id="retoNew">Diseñar un nuevo reto</button>`;
     return;
   }
   const r = todayRec(false), g = r ? r.g : {};
   const doneToday = ch.days.includes(today);
-  const dayN = Math.min(30, done + (doneToday ? 0 : 1));
-  const chips = MIND_GAMES.map(k =>
+  const dayN = Math.min(len, done + (doneToday ? 0 : 1));
+  const chips = games.map(k =>
     `<span class="gchip ${g[k] !== undefined ? "ok" : ""}">${GAME_META[k].ico} ${GAME_META[k].n}${g[k] !== undefined ? " ✓" : ""}</span>`).join("");
+  const streak = trainStreak();
   el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline">
-      <b style="font-size:17px">Día ${dayN} de 30</b><span style="opacity:.6;font-size:13px">${done} completados</span></div>
-    <div class="pbar"><i style="width:${Math.round(done / 30 * 100)}%"></i></div>
+      <b style="font-size:17px">Día ${dayN} de ${len}</b><span style="opacity:.6;font-size:13px">${done} completados</span></div>
+    <div class="pbar"><i style="width:${Math.round(done / len * 100)}%"></i></div>
     <div style="font-size:13px;opacity:.65">${doneToday ? "Sesión de hoy completada ✓ Vuelve mañana." : "Ejercicios de hoy:"}</div>
-    <div class="gchips">${chips}</div>`;
+    <div class="gchips">${chips}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+      <span style="font-size:12.5px;opacity:.7">🔥 Racha: ${streak} día${streak === 1 ? "" : "s"} · Nivel ${mind.level + 1}</span>
+      <button id="retoQuit" style="background:none;border:none;color:#fb7185;font-size:12.5px;cursor:pointer;opacity:.85;padding:4px">${Date.now() - retoQuitArm < 2500 ? "¿Seguro? Toca otra vez" : "Abandonar reto"}</button>
+    </div>`;
 }
 $("retoBody").addEventListener("click", (e) => {
-  if (e.target.id === "retoStart") {
-    mind.challenge = { start: todayKey(), days: [] };
+  const c = e.target.closest("[data-rlen],[data-rgame],[data-rlvl],[data-rpace],#retoStart,#retoNew,#retoQuit");
+  if (!c) return;
+  if (c.dataset.rlen) { retoCfg.len = +c.dataset.rlen; renderReto(); }
+  else if (c.dataset.rgame) {
+    const g = c.dataset.rgame;
+    if (retoCfg.games.includes(g)) {
+      if (retoCfg.games.length <= 2) { toast("Elige al menos 2 ejercicios."); return; }
+      retoCfg.games = retoCfg.games.filter(x => x !== g);
+    } else retoCfg.games.push(g);
+    renderReto();
+  }
+  else if (c.dataset.rlvl !== undefined) { retoCfg.lvl = +c.dataset.rlvl; renderReto(); }
+  else if (c.dataset.rpace) { retoCfg.pace = +c.dataset.rpace; renderReto(); }
+  else if (c.id === "retoStart") {
+    mind.challenge = { start: todayKey(), days: [], len: retoCfg.len, games: [...retoCfg.games], pace: retoCfg.pace };
+    mind.level = retoCfg.lvl; // la dificultad elegida es el punto de partida
     saveMind(); renderMind();
-    toast("Reto iniciado 💪 Completa los 5 ejercicios hoy.", 3800);
+    toast(`Reto de ${retoCfg.len} días iniciado 💪 Nivel inicial: ${retoCfg.lvl + 1}. Completa tus ${retoCfg.games.length} ejercicios hoy.`, 4200);
+  }
+  else if (c.id === "retoNew") { mind.challenge = null; saveMind(); renderMind(); }
+  else if (c.id === "retoQuit") {
+    if (Date.now() - retoQuitArm < 2500) {
+      mind.challenge = null; retoQuitArm = 0;
+      saveMind(); renderMind();
+      toast("Reto abandonado. Tu historial, nivel y récords se conservan.");
+    } else {
+      retoQuitArm = Date.now();
+      renderReto();
+      setTimeout(() => { if (Date.now() - retoQuitArm >= 2400) renderReto(); }, 2600);
+    }
   }
 });
 $("reportBtn").addEventListener("click", () => { buildReport(); showGame("report"); });
@@ -1574,7 +1654,7 @@ $("reportBtn").addEventListener("click", () => { buildReport(); showGame("report
 /* Flujo guiado: al terminar un ejercicio, ofrecer el siguiente pendiente del día */
 function nextPending() {
   const r = todayRec(false), g = r ? r.g : {};
-  return MIND_GAMES.find(k => g[k] === undefined) || null;
+  return activeGames().find(k => g[k] === undefined) || null;
 }
 function maybeOfferNext() {
   const r = todayRec(false);
@@ -1638,9 +1718,10 @@ function buildReport() {
 
   let rows = "", weakest = null, weakestScore = 101, strongest = null, strongestScore = -1, records = 0;
   const missing = [];
+  const required = activeGames();
   MIND_GAMES.forEach(k => {
     const m = GAME_META[k], v = r.g[k];
-    if (v === undefined) { missing.push(m.ico + " " + m.n); return; }
+    if (v === undefined) { if (required.includes(k)) missing.push(m.ico + " " + m.n); return; }
     const avg = gameAvg(k, r.d);
     let best = bests()[k];
     if (best === undefined) { // derivarlo del historial si el almacén de récords se perdió
@@ -1676,7 +1757,8 @@ function buildReport() {
   });
 
   const ch = mind.challenge;
-  const retoLine = ch ? (ch.days.length >= 30 ? "🏆 Reto de 30 días completado." : `Reto: ${ch.days.length}/30 días completados.`) : "Sin reto activo — inícialo en Mente para entrenar con estructura.";
+  const chLen = ch ? (ch.len || 30) : 30;
+  const retoLine = ch ? (ch.days.length >= chLen ? `🏆 Reto de ${chLen} días completado.` : `Reto: ${ch.days.length}/${chLen} días completados.`) : "Sin reto activo — diseña el tuyo en Mente para entrenar con estructura.";
   body.innerHTML = `<h2>Informe · ${fecha}</h2>
     <div id="repIdx">${r.idx}</div>
     <div id="repIdxSub">índice cognitivo (0–1000)${avgIdx !== null ? " · tu media reciente: " + avgIdx : ""}</div>
@@ -1754,6 +1836,10 @@ function renderMind() {
     const el = $("td" + k);
     if (el) el.textContent = gg[k] !== undefined ? "hoy " + gg[k] + GAME_META[k].u : "";
   });
+  $("badges").innerHTML = BADGES.map(b => {
+    const ok = b.ok();
+    return `<span class="gchip${ok ? " ok" : ""}"${ok ? "" : ' style="opacity:.45"'}>${ok ? b.e : "🔒"} ${b.n}</span>`;
+  }).join("");
   if (!st.on) $("stroopTime").textContent = DIFF.stroopDur() + " s";
   if (!ca.on) $("calcTime").textContent = DIFF.calcDur() + " s";
   renderReto();
