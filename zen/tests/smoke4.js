@@ -67,9 +67,14 @@ const { chromium } = require('playwright-core');
   // Informe manual compara con media previa
   await page.click('#reportBtn');
   const rep2 = await page.textContent('#reportBody');
-  console.log('informe con comparativa:', /media reciente|primera sesión/.test(rep2) ? 'OK' : 'FALLO');
-  console.log('informe con consejo:', /margen/.test(rep2) ? 'OK' : 'FALLO');
+  console.log('informe con comparativa:', /media reciente|rimera sesión/.test(rep2) ? 'OK' : 'FALLO');
+  console.log('informe con consejo:', /Qué mejorar/.test(rep2) ? 'OK' : 'FALLO');
   console.log('informe estado reto:', /Reto: \d+\/30/.test(rep2) ? 'OK' : 'FALLO');
+  console.log('veredicto del día:', await page.isVisible('#repVerdict') ? 'OK' : 'FALLO');
+  console.log('barras 0-100 por área:', (await page.locator('.repBar').count()) === 5 ? 'OK' : 'FALLO');
+  console.log('medias y récords por ejercicio:', /tu media:/.test(rep2) && /tu récord:/.test(rep2) ? 'OK' : 'FALLO');
+  console.log('referencias típicas:', /típico adulto/.test(rep2) ? 'OK' : 'FALLO');
+  console.log('punto fuerte:', /punto fuerte/.test(rep2) ? 'OK' : 'FALLO');
   await page.click('#game-report [data-back]');
 
   // Un juego sigue funcionando de punta a punta (reacción)

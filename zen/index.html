@@ -46,7 +46,8 @@
   body.light .switch .tr { background:rgba(40,55,110,.18); border-color:rgba(35,45,90,.12); }
   body.light #toast { background:rgba(255,255,255,.95); color:#212842; border-color:rgba(35,45,90,.16); }
   body.light .ringbg { stroke:rgba(40,55,110,.13); }
-  body.light #laps li, body.light .repRow, body.light .setRow { border-color:rgba(35,45,90,.1); }
+  body.light #laps li, body.light .repRow, body.light .setRow, body.light .repGame { border-color:rgba(35,45,90,.1); }
+  body.light .repBar { background:rgba(40,55,110,.12); }
   body.light .themeDot.sel { border-color:#212842; box-shadow:0 0 10px rgba(0,0,0,.2); }
   body.light .orb { opacity:.35; }
   body.light .stroopBtns button { color:#212842; }
@@ -170,7 +171,16 @@
   .repRow .rv { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
   .repRow .up { color:#34d399; } .repRow .dn { color:#fbbf24; }
   #repIdx { font-size:48px; font-weight:200; text-align:center; font-variant-numeric:tabular-nums; padding:8px 0 0; }
-  #repIdxSub { text-align:center; font-size:13px; opacity:.6; padding-bottom:14px; }
+  #repIdxSub { text-align:center; font-size:13px; opacity:.6; padding-bottom:10px; }
+  #repVerdict { text-align:center; font-size:14px; line-height:1.55; padding:0 4px 16px; }
+  .repGame { padding:11px 2px; border-bottom:1px solid rgba(255,255,255,.08); }
+  .repGame:last-of-type { border-bottom:none; }
+  .repGame .r1 { display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:14.5px; }
+  .repGame .rv { font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .repGame .meta { font-size:11.5px; opacity:.55; margin-top:3px; }
+  .repBar { height:4px; border-radius:99px; background:rgba(255,255,255,.1); margin-top:8px; overflow:hidden; }
+  .repBar i { display:block; height:100%; background:linear-gradient(90deg,var(--accA),var(--accB)); border-radius:99px; }
+  .tag-up { color:#34d399; } .tag-mid { color:#fbbf24; } .tag-dn { color:#fb923c; }
 
   #reactPad {
     height:280px; border-radius:26px; display:flex; flex-direction:column; gap:8px;
@@ -1582,13 +1592,27 @@ $("nextBar").addEventListener("click", () => {
   if (nk) { ensureAudio(); showGame(nk); }
 });
 
-function prevValue(game, beforeDate) {
-  for (let i = mind.hist.length - 1; i >= 0; i--) {
+function gameAvg(game, beforeDate, n = 5) {
+  const vals = [];
+  for (let i = mind.hist.length - 1; i >= 0 && vals.length < n; i--) {
     const h = mind.hist[i];
-    if (h.d < beforeDate && h.g[game] !== undefined) return h.g[game];
+    if (h.d < beforeDate && h.g[game] !== undefined) vals.push(h.g[game]);
   }
-  return null;
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 }
+const NORMS_REF = {
+  react: "típico adulto: 200–300 ms",
+  simon: "típico: nivel 5–8",
+  digits: "típico: 5–9 dígitos",
+  stroop: "", calc: ""
+};
+const ADVICE = {
+  react:  "prueba una ronda de Reacción tras 5 minutos de respiración: el estado de calma-alerta acelera la respuesta.",
+  stroop: "una ronda extra de Stroop al día fortalece el control inhibitorio de la corteza prefrontal.",
+  simon:  "en Secuencias, agrupa los colores en patrones o melodías: la memoria visoespacial mejora con estrategia, no con esfuerzo bruto.",
+  digits: "en Dígitos, agrupa los números de 2 en 2 (así memorizan los expertos): la amplitud sube en pocos días.",
+  calc:   "una ronda diaria de Cálculo basta: la velocidad aritmética responde muy rápido al entrenamiento."
+};
 function buildReport() {
   const body = $("reportBody");
   const recs = mind.hist.filter(h => h.idx != null);
@@ -1598,43 +1622,73 @@ function buildReport() {
   }
   const r = recs[recs.length - 1];
   const prev = recs.filter(h => h.d < r.d).slice(-3);
-  const avg = prev.length ? Math.round(prev.reduce((s, h) => s + h.idx, 0) / prev.length) : null;
-  const delta = avg !== null ? r.idx - avg : null;
-  const deltaTxt = delta === null ? "primera sesión registrada"
-    : delta >= 0 ? `▲ ${delta} sobre tu media reciente (${avg})` : `▼ ${-delta} bajo tu media reciente (${avg})`;
+  const avgIdx = prev.length ? Math.round(prev.reduce((s, h) => s + h.idx, 0) / prev.length) : null;
   const fecha = new Date(r.d + "T12:00").toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
-  let rows = "", weakest = null, weakestScore = 101;
+
+  // Veredicto del día en lenguaje claro
+  let verdict;
+  if (avgIdx === null) {
+    verdict = "📍 <b>Primera sesión registrada.</b> Esta es tu línea base: a partir de la próxima sesión el informe te dirá si estás mejorando.";
+  } else {
+    const d = r.idx - avgIdx;
+    if (d >= Math.max(10, avgIdx * 0.05)) verdict = `🟢 <b>Muy buen día.</b> Rendiste por encima de tu media reciente (+${d} puntos).`;
+    else if (d >= -Math.max(10, avgIdx * 0.05)) verdict = `🟡 <b>Día estable.</b> Mantuviste tu nivel (${d >= 0 ? "+" : ""}${d} puntos frente a tu media).`;
+    else verdict = `🟠 <b>Día por debajo de tu media</b> (${d} puntos). No pasa nada: el sueño, la hora y el cansancio influyen mucho. Fíjate en la tendencia de la curva, no en un día suelto.`;
+  }
+
+  let rows = "", weakest = null, weakestScore = 101, strongest = null, strongestScore = -1, records = 0;
+  const missing = [];
   MIND_GAMES.forEach(k => {
     const m = GAME_META[k], v = r.g[k];
-    if (v === undefined) { rows += `<div class="repRow"><span>${m.ico} ${m.n}</span><span class="rv" style="opacity:.4">sin jugar hoy</span></div>`; return; }
-    const pv = prevValue(k, r.d);
-    let trend = "";
-    if (pv !== null && pv !== v) {
-      const better = m.lowIsGood ? v < pv : v > pv;
-      trend = better ? ` <span class="up">↑</span>` : ` <span class="dn">↓</span>`;
+    if (v === undefined) { missing.push(m.ico + " " + m.n); return; }
+    const avg = gameAvg(k, r.d);
+    let best = bests()[k];
+    if (best === undefined) { // derivarlo del historial si el almacén de récords se perdió
+      const vals = mind.hist.filter(h => h.g[k] !== undefined).map(h => h.g[k]);
+      if (vals.length) best = m.lowIsGood ? Math.min(...vals) : Math.max(...vals);
     }
-    const norm = NORM[k](v);
+    const norm = Math.round(NORM[k](v));
     if (norm < weakestScore) { weakestScore = norm; weakest = k; }
-    rows += `<div class="repRow"><span>${m.ico} ${m.n}</span><span class="rv">${v}${m.u}${pv !== null ? ` <small style="opacity:.45">antes ${pv}${m.u}</small>` : ""}${trend}</span></div>`;
+    if (norm > strongestScore) { strongestScore = norm; strongest = k; }
+    let status, cls;
+    const beatsAvg = avg === null ? true : (m.lowIsGood ? v < avg : v > avg);
+    if (best !== undefined && v === best && beatsAvg && avg !== null) {
+      status = "🏆 récord personal"; cls = "tag-up"; records++;
+    } else if (avg === null) {
+      status = "línea base"; cls = "tag-mid";
+    } else {
+      const better = m.lowIsGood ? v < avg * 0.97 : v > avg * 1.03;
+      const worse  = m.lowIsGood ? v > avg * 1.03 : v < avg * 0.97;
+      if (better) { status = "↑ mejor que tu media"; cls = "tag-up"; }
+      else if (worse) { status = "↓ bajo tu media"; cls = "tag-dn"; }
+      else { status = "≈ estable"; cls = "tag-mid"; }
+    }
+    const meta = [
+      avg !== null ? "tu media: " + Math.round(avg) + m.u : null,
+      best !== undefined ? "tu récord: " + best + m.u : null,
+      NORMS_REF[k] || null
+    ].filter(Boolean).join(" · ");
+    rows += `<div class="repGame">
+      <div class="r1"><span>${m.ico} ${m.n} <span class="${cls}" style="font-size:12px">${status}</span></span><span class="rv">${v}${m.u}</span></div>
+      <div class="meta">${meta}</div>
+      <div class="repBar"><i style="width:${norm}%"></i></div>
+    </div>`;
   });
-  const ADVICE = {
-    react:  "Tu mayor margen está en la velocidad de reacción: prueba una ronda tras 5 minutos de respiración; el estado de calma-alerta la mejora.",
-    stroop: "Tu mayor margen está en el control inhibitorio: una ronda extra de Stroop al día fortalece la corteza prefrontal.",
-    simon:  "Tu mayor margen está en la memoria visoespacial: repite Secuencias intentando agrupar los colores en patrones.",
-    digits: "Tu mayor margen está en la retención inmediata: en Dígitos, agrupa los números de 2 en 2 (así trabaja la memoria experta).",
-    calc:   "Tu mayor margen está en la agilidad de cálculo: una ronda diaria de 60 segundos es suficiente para ver mejora en 2 semanas."
-  };
+
   const ch = mind.challenge;
-  const retoLine = ch ? (ch.days.length >= 30 ? "🏆 Reto de 30 días completado." : `Reto: ${ch.days.length}/30 días completados.`) : "Sin reto activo — inícialo en Mente para progresar con estructura.";
+  const retoLine = ch ? (ch.days.length >= 30 ? "🏆 Reto de 30 días completado." : `Reto: ${ch.days.length}/30 días completados.`) : "Sin reto activo — inícialo en Mente para entrenar con estructura.";
   body.innerHTML = `<h2>Informe · ${fecha}</h2>
     <div id="repIdx">${r.idx}</div>
-    <div id="repIdxSub">índice cognitivo (0–1000) · ${deltaTxt}</div>
+    <div id="repIdxSub">índice cognitivo (0–1000)${avgIdx !== null ? " · tu media reciente: " + avgIdx : ""}</div>
+    <div id="repVerdict">${verdict}</div>
     ${rows}
-    <div style="height:14px"></div>
+    ${missing.length ? `<p class="note" style="margin-top:12px">⏳ <b>Te falta jugar hoy:</b> ${missing.join(", ")}. Complétalos para cerrar el día del reto y tener el informe completo.</p>` : ""}
+    ${records ? `<p class="note" style="margin-top:12px">🏆 ${records === 1 ? "1 récord personal hoy. Excelente señal" : records + " récords personales hoy. Señal clarísima"} de progreso.</p>` : ""}
+    ${strongest && weakest && strongest !== weakest ? `<p class="note">💪 <b>Tu punto fuerte hoy:</b> ${GAME_META[strongest].n} (${strongestScore}/100).</p>` : ""}
+    ${weakest ? `<p class="note">🎯 <b>Qué mejorar:</b> ${GAME_META[weakest].n} es tu mayor margen (${weakestScore}/100) — ${ADVICE[weakest]}</p>` : ""}
+    <div style="height:8px"></div>
     <div class="repRow" style="border:none"><span>Nivel de dificultad</span><span class="rv">${(r.lvl ?? mind.level) + 1}</span></div>
-    <p class="note" style="margin-top:6px">${retoLine}</p>
-    ${weakest ? `<p class="note">${ADVICE[weakest]}</p>` : ""}
-    <p class="note">Días entrenados: ${recs.length} · La curva completa está en Mente → Progreso.</p>`;
+    <p class="note">${retoLine} · Días entrenados: ${recs.length} · Las barras muestran tu puntuación 0–100 por área. La curva completa está en Mente → Progreso.</p>`;
 }
 function drawChart() {
   const cv = $("chartCv");

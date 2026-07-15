@@ -66,17 +66,23 @@ const { chromium } = require('playwright-core');
   console.log('tarjeta muestra hoy:', td.includes('hoy 300') ? 'OK' : 'FALLO(' + td + ')');
 
   // --- Simon: al fallar limpia los pads (no quedan iluminados) ---
+  // El primer toque puede acertar por azar: insistir hasta provocar el fallo
   await page.click('.gameCard[data-game="simon"]');
   await page.click('#simonStart');
-  await page.waitForFunction(() => document.getElementById('simonMsg').textContent === 'Tu turno', null, { timeout: 8000 });
-  // tocar dos pads distintos: al menos uno es incorrecto → fin con revelado
-  await page.tap('.simonPad[data-p="0"]');
-  await page.waitForTimeout(150);
-  await page.tap('.simonPad[data-p="1"]');
-  await page.waitForTimeout(2200);
+  let failed = false;
+  for (let attempt = 0; attempt < 6 && !failed; attempt++) {
+    await page.waitForFunction(() => /Tu turno|nivel/.test(document.getElementById('simonMsg').textContent), null, { timeout: 12000 });
+    if ((await page.textContent('#simonMsg')).includes('nivel')) { failed = true; break; }
+    await page.tap(`.simonPad[data-p="${attempt % 4}"]`);
+    await page.waitForTimeout(160);
+    await page.tap(`.simonPad[data-p="${(attempt + 1) % 4}"]`);
+    await page.waitForTimeout(1600);
+    if ((await page.textContent('#simonMsg')).includes('nivel')) failed = true;
+  }
+  await page.waitForTimeout(600);
   const litCount = await page.locator('.simonPad.lit').count();
   const msg = await page.textContent('#simonMsg');
-  console.log('fin con revelado y pads limpios:', litCount === 0 && msg.includes('nivel') ? 'OK' : 'FALLO(lit=' + litCount + ', ' + msg + ')');
+  console.log('fin con revelado y pads limpios:', failed && litCount === 0 && msg.includes('nivel') ? 'OK' : 'FALLO(lit=' + litCount + ', ' + msg + ')');
 
   console.log('\nERRORES JS:', errors.length ? errors.join('\n') : 'ninguno');
   await browser.close();
