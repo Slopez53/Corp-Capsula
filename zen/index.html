@@ -1140,13 +1140,13 @@ document.querySelector("#game-calc [data-back]").addEventListener("click", () =>
 /* =========================================================================
    PODÓMETRO
    ========================================================================= */
-const SENS = { baja: 2.6, media: 1.8, alta: 1.15 };
+const SENS = { baja: 1.4, media: 0.8, alta: 0.45 };
 const STEP_RING_C = 2 * Math.PI * 93;
 $("stepRingFg").style.strokeDasharray = STEP_RING_C;
 const ped = {
-  active:false, steps:0, total:0, gotData:false, probeT:0,
-  gravity:{ x:0, y:0, z:0 }, lastStepAt:0, rising:false,
-  ALPHA:0.8, MIN_STEP_MS:280
+  active:false, steps:0, total:0, gotData:false, probeT:0, statusInt:0,
+  sm:0, base:0, init:false, armed:true, lastStepAt:0, lastT:0, level:0,
+  MIN_STEP_MS:280
 };
 function pedThreshold() { return SENS[cfg.sens] || SENS.media; }
 function pedLoad() {
@@ -1200,24 +1200,35 @@ function renderWeek() {
 function onMotion(e) {
   if (!ped.active) return;
   ped.gotData = true;
-  const a = e.accelerationIncludingGravity;
-  if (!a || a.x === null) return;
-  const g = ped.gravity, A = ped.ALPHA;
-  g.x = A * g.x + (1 - A) * a.x;
-  g.y = A * g.y + (1 - A) * a.y;
-  g.z = A * g.z + (1 - A) * a.z;
-  const lx = a.x - g.x, ly = a.y - g.y, lz = a.z - g.z;
-  const mag = Math.sqrt(lx * lx + ly * ly + lz * lz);
-  const now = Date.now();
+  // Preferir aceleración lineal (sin gravedad); si no existe, usar la total —
+  // la línea base adaptativa absorbe la gravedad automáticamente.
+  let ax, ay, az;
+  const la = e.acceleration, ga = e.accelerationIncludingGravity;
+  if (la && la.x !== null && (la.x !== 0 || la.y !== 0 || la.z !== 0)) { ax = la.x; ay = la.y; az = la.z; }
+  else if (ga && ga.x !== null) { ax = ga.x; ay = ga.y; az = ga.z; }
+  else return;
+  const now = performance.now();
+  const dt = ped.lastT ? Math.min(0.2, (now - ped.lastT) / 1000) : 0.016;
+  ped.lastT = now;
+  const mag = Math.sqrt(ax * ax + ay * ay + az * az);
+  // Cambio brusco de régimen (p. ej. el sistema empieza a entregar otro tipo
+  // de señal): reiniciar el filtro para no quedar ciegos durante segundos
+  if (!ped.init || Math.abs(mag - ped.sm) > 6) { ped.sm = mag; ped.base = mag; ped.init = true; return; }
+  // Suavizado (~50 ms) y línea base (~1,5 s), independientes de la frecuencia del sensor
+  ped.sm += (mag - ped.sm) * Math.min(1, dt / 0.05);
+  ped.base += (ped.sm - ped.base) * Math.min(1, dt / 1.5);
+  const dev = ped.sm - ped.base;
+  ped.level = Math.max(dev, ped.level * 0.96); // pico reciente, para el indicador en vivo
   const TH = pedThreshold();
-  if (mag > TH && !ped.rising && now - ped.lastStepAt > ped.MIN_STEP_MS) {
-    ped.rising = true;
-    ped.lastStepAt = now;
+  const nowMs = Date.now();
+  if (dev > TH && ped.armed && nowMs - ped.lastStepAt > ped.MIN_STEP_MS) {
+    ped.armed = false;
+    ped.lastStepAt = nowMs;
     ped.steps++; ped.total++;
     pedRender();
     if (ped.steps % 20 === 0) pedSave();
-  } else if (mag < TH * 0.6) {
-    ped.rising = false;
+  } else if (dev < TH * 0.25) {
+    ped.armed = true;
   }
 }
 function sensorStatus(msg, ok) {
@@ -1244,12 +1255,20 @@ async function pedStart() {
     }
   }
   ped.active = true; ped.gotData = false;
+  ped.init = false; ped.lastT = 0; ped.armed = true; ped.level = 0;
   window.addEventListener("devicemotion", onMotion);
   clearTimeout(ped.probeT);
   ped.probeT = setTimeout(() => {
     if (ped.active && !ped.gotData) sensorStatus("El sensor no envía datos. En un PC no hay acelerómetro; en el teléfono, abre el archivo directo en el navegador.", false);
-    else if (ped.active) sensorStatus("Sensor activo, contando.", true);
   }, 3500);
+  // Indicador en vivo: confirma que el sensor entrega datos y con qué fuerza
+  clearInterval(ped.statusInt);
+  ped.statusInt = setInterval(() => {
+    if (!ped.active || !ped.gotData) return;
+    const lvl = ped.level.toFixed(1), th = pedThreshold().toFixed(1);
+    if (ped.level > pedThreshold() * 0.5) sensorStatus(`Sensor activo · señal ${lvl} / umbral ${th}`, true);
+    else sensorStatus(`Sensor activo · en reposo (señal ${lvl} / umbral ${th}). Camina con el teléfono en la mano o el bolsillo.`, true);
+  }, 700);
   await requestWakeLock("ped");
   $("stepBtn").textContent = "Pausar conteo";
   $("stepBtn").classList.add("stop");
@@ -1261,6 +1280,7 @@ function pedStop() {
   ped.active = false;
   window.removeEventListener("devicemotion", onMotion);
   clearTimeout(ped.probeT);
+  clearInterval(ped.statusInt);
   releaseWakeLock("ped");
   pedSave();
   $("stepBtn").textContent = "Iniciar conteo";
