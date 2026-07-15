@@ -57,9 +57,15 @@
   @keyframes drift1 { to { transform:translate(8vmax,6vmax) scale(1.15);} }
   @keyframes drift2 { to { transform:translate(-6vmax,-8vmax) scale(.9);} }
   @keyframes drift3 { to { transform:translate(6vmax,-6vmax) scale(1.1);} }
-  @media (prefers-reduced-motion: reduce) { .orb { animation:none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .orb { animation:none; }
+    #breathCircle { transition:none !important; animation:none !important; }
+  }
 
   #app { position:relative; z-index:1; height:100%; display:flex; flex-direction:column; }
+  /* En tablets y PC la app se centra con ancho de móvil, no se estira */
+  header, main { width:100%; max-width:560px; margin-left:auto; margin-right:auto; }
+  nav { width:calc(100% - 28px); max-width:532px; }
   header { padding:calc(env(safe-area-inset-top,0px) + 14px) 22px 10px; display:flex; justify-content:space-between; align-items:baseline; }
   header h1 { font-size:20px; font-weight:700; letter-spacing:.5px; }
   header h1 span { opacity:.5; font-weight:300; }
@@ -260,7 +266,7 @@
 
   /* ---- Nav ---- */
   nav {
-    display:flex; margin:0 10px; margin-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
+    display:flex; margin:0 auto; margin-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
     background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
     border-radius:24px; padding:6px;
     backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%);
@@ -691,6 +697,15 @@
         <p class="note">Elige el patrón "Personal" en Meditar para usar estos valores.</p>
       </div>
       <div class="glass">
+        <h2>Instalar como app</h2>
+        <p class="note" style="margin-top:0">
+          <b>Android (Chrome):</b> menú ⋮ → "Añadir a pantalla de inicio".<br>
+          <b>iPhone (Safari):</b> botón compartir → "Añadir a pantalla de inicio".<br>
+          Se abrirá a pantalla completa, como una app normal y sin barra del navegador.<br><br>
+          💡 En iPhone, si no oyes campanas ni alarmas, sube el interruptor lateral de silencio.
+        </p>
+      </div>
+      <div class="glass">
         <h2>Privacidad y datos</h2>
         <p class="note" style="margin-top:0">Zen no usa internet, cuentas ni rastreo. Todos tus datos viven solo en este dispositivo. Exporta una copia para no perder tu progreso si cambias de teléfono.</p>
         <div style="height:12px"></div>
@@ -954,6 +969,8 @@ function medFinish(completed) {
   stopAmbient();
   $("breathCircle").classList.remove("freeFloat");
   $("medPause").textContent = "Pausar";
+  $("medStop").textContent = "Terminar";
+  medStopArm = 0;
   releaseWakeLock("med");
   if (completed) {
     chime(432, 2.2); setTimeout(() => chime(528, 2.4), 350);
@@ -1016,7 +1033,17 @@ $("medPause").addEventListener("click", () => {
     medTickStart();
   }
 });
-$("medStop").addEventListener("click", () => medFinish(false));
+// Doble confirmación: un toque accidental no debe perder la sesión
+let medStopArm = 0;
+$("medStop").addEventListener("click", () => {
+  if (Date.now() - medStopArm < 2500) {
+    medFinish(false);
+  } else {
+    medStopArm = Date.now();
+    $("medStop").textContent = "¿Terminar?";
+    setTimeout(() => { if (Date.now() - medStopArm >= 2400) $("medStop").textContent = "Terminar"; }, 2500);
+  }
+});
 renderMedStats();
 
 /* =========================================================================
@@ -1326,6 +1353,14 @@ $("digitStart").addEventListener("click", () => {
   dg.span = Math.max(dg.span, DIFF.digitStartSpan()); // arranque más exigente por nivel
   $("digitStart").style.display = "none";
   dgShowSeq();
+});
+// Teclado físico para Dígitos (uso en PC)
+document.addEventListener("keydown", (e) => {
+  if (!$("game-digits").classList.contains("active")) return;
+  if ($("digitPad").style.display === "none") return;
+  if (/^[0-9]$/.test(e.key)) dgKey(e.key);
+  else if (e.key === "Backspace") dgKey("⌫");
+  else if (e.key === "Enter") dgKey("OK");
 });
 document.querySelector("#game-digits [data-back]").addEventListener("click", () => {
   dg.timeouts.forEach(clearTimeout); dg.timeouts = []; dg.showing = false;
@@ -1643,6 +1678,7 @@ function drawChart() {
   c.fillText(fD(pts[0].d), P.l, H - 5);
   c.textAlign = "right"; c.fillText(fD(pts[pts.length - 1].d), W - P.r, H - 5);
 }
+window.addEventListener("resize", () => requestAnimationFrame(() => drawChart()));
 function renderMind() {
   const recs = mind.hist.filter(h => h.idx != null);
   const today = todayRec(false);
@@ -2002,6 +2038,9 @@ function tmTick() {
 function tmStart(ms) {
   ensureAudio();
   tm.totalMs = ms; tm.endAt = Date.now() + ms; tm.running = true;
+  // Mantener la pantalla despierta: si el teléfono se bloquea, el navegador
+  // se congela y la alarma no sonaría a tiempo
+  requestWakeLock("timer");
   store.set("timer", { endAt: tm.endAt, totalMs: tm.totalMs });
   tmShow(true);
   $("tmMain").textContent = "Cancelar"; $("tmMain").classList.add("stop");
@@ -2010,7 +2049,7 @@ function tmStart(ms) {
   tm.int = setInterval(tmTick, 200);
   tmTick();
 }
-function tmStopAlarm() { clearInterval(tm.alarmInt); tm.alarmInt = 0; vibrate(0); }
+function tmStopAlarm() { clearInterval(tm.alarmInt); tm.alarmInt = 0; vibrate(0); releaseWakeLock("timer"); }
 function tmCancel() {
   tm.running = false; clearInterval(tm.int); tmStopAlarm();
   store.set("timer", null);
@@ -2026,6 +2065,7 @@ function tmDone() {
   vibrate([300, 150, 300, 150, 500]);
   let n = 0;
   tmStopAlarm();
+  requestWakeLock("timer"); // seguir despiertos mientras suena la alarma
   tm.alarmInt = setInterval(() => {
     chime(880, .35, .22); setTimeout(() => chime(660, .3, .2), 180);
     if (++n >= 8) tmStopAlarm();
@@ -2054,6 +2094,7 @@ tmRenderSetup();
   if (saved && saved.endAt) {
     if (saved.endAt > Date.now()) {
       tm.totalMs = saved.totalMs; tm.endAt = saved.endAt; tm.running = true;
+      requestWakeLock("timer");
       tmShow(true);
       $("tmMain").textContent = "Cancelar"; $("tmMain").classList.add("stop");
       tm.int = setInterval(tmTick, 200);
