@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Zen · Entrenamiento</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    background:#0b0f1a;
+    color:#eef2ff;
+    touch-action: manipulation;
+    user-select:none; -webkit-user-select:none;
+    position:fixed; inset:0;
+  }
+  /* ---------- Fondo liquid glass ---------- */
+  .bg { position:fixed; inset:0; z-index:0; overflow:hidden; }
+  .orb { position:absolute; border-radius:50%; filter:blur(90px); opacity:.55; will-change:transform; }
+  .orb1 { width:60vmax; height:60vmax; left:-20vmax; top:-15vmax; background:radial-gradient(circle,#3b4fd8,transparent 70%); animation:drift1 26s ease-in-out infinite alternate; }
+  .orb2 { width:50vmax; height:50vmax; right:-18vmax; top:30%;  background:radial-gradient(circle,#7c3aed,transparent 70%); animation:drift2 32s ease-in-out infinite alternate; }
+  .orb3 { width:45vmax; height:45vmax; left:10%; bottom:-20vmax; background:radial-gradient(circle,#0ea5b7,transparent 70%); animation:drift3 38s ease-in-out infinite alternate; }
+  @keyframes drift1 { to { transform:translate(8vmax,6vmax) scale(1.15);} }
+  @keyframes drift2 { to { transform:translate(-6vmax,-8vmax) scale(.9);} }
+  @keyframes drift3 { to { transform:translate(6vmax,-6vmax) scale(1.1);} }
+
+  /* ---------- Layout ---------- */
+  #app { position:relative; z-index:1; height:100%; display:flex; flex-direction:column; }
+  header {
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 22px 10px;
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  header h1 { font-size:20px; font-weight:700; letter-spacing:.5px; }
+  header h1 span { opacity:.5; font-weight:300; }
+  #miniClock { font-size:15px; font-variant-numeric:tabular-nums; opacity:.65; font-weight:500; }
+
+  main { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:6px 18px 18px; }
+  .view { display:none; animation:fadeIn .35s ease; }
+  .view.active { display:block; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px);} to { opacity:1; transform:none;} }
+
+  /* ---------- Glass ---------- */
+  .glass {
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 26px;
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.12);
+    padding: 22px;
+    margin-bottom: 14px;
+  }
+  .glass h2 { font-size:13px; text-transform:uppercase; letter-spacing:2px; opacity:.55; margin-bottom:14px; font-weight:600; }
+
+  /* ---------- Controles ---------- */
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip {
+    padding:9px 16px; border-radius:999px; font-size:14px; font-weight:600;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+    color:#eef2ff; cursor:pointer; transition:all .2s;
+  }
+  .chip.sel { background:rgba(139,160,255,.28); border-color:rgba(139,160,255,.7); box-shadow:0 0 18px rgba(139,160,255,.25); }
+  .btn {
+    display:block; width:100%; padding:16px; border:none; border-radius:20px;
+    font-size:16px; font-weight:700; cursor:pointer; color:#fff; letter-spacing:.3px;
+    background:linear-gradient(135deg,#5b6cff,#8b5cf6);
+    box-shadow:0 6px 24px rgba(99,102,241,.4), inset 0 1px 0 rgba(255,255,255,.25);
+    transition:transform .15s, opacity .2s;
+  }
+  .btn:active { transform:scale(.97); }
+  .btn.ghost { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); box-shadow:none; }
+  .btn.stop { background:linear-gradient(135deg,#f43f5e,#e11d48); box-shadow:0 6px 24px rgba(244,63,94,.35); }
+  .btn[disabled] { opacity:.4; pointer-events:none; }
+  .row { display:flex; gap:10px; }
+  .row .btn { flex:1; }
+
+  .bignum { font-size:56px; font-weight:200; font-variant-numeric:tabular-nums; text-align:center; letter-spacing:1px; }
+  .sub { text-align:center; opacity:.55; font-size:14px; margin-top:4px; }
+  .statgrid { display:flex; gap:10px; margin-top:14px; }
+  .stat { flex:1; text-align:center; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); border-radius:16px; padding:12px 6px; }
+  .stat b { display:block; font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .stat span { font-size:11px; opacity:.5; text-transform:uppercase; letter-spacing:1px; }
+
+  /* ---------- Meditación ---------- */
+  #breathWrap { display:flex; flex-direction:column; align-items:center; padding:10px 0 6px; }
+  #breathCircle {
+    width:190px; height:190px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.35), rgba(139,160,255,.18) 45%, rgba(91,108,255,.10) 70%);
+    border:1.5px solid rgba(255,255,255,.35);
+    box-shadow:0 0 60px rgba(120,140,255,.35), inset 0 0 40px rgba(255,255,255,.12);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    transform:scale(.72);
+    transition:transform 4s cubic-bezier(.4,0,.4,1);
+  }
+  #breathPhase { font-size:21px; font-weight:600; letter-spacing:1px; }
+  #breathCount { font-size:15px; opacity:.6; margin-top:4px; font-variant-numeric:tabular-nums; }
+  #medRemaining { margin-top:18px; font-size:30px; font-weight:200; font-variant-numeric:tabular-nums; opacity:.85; }
+
+  /* ---------- Reacción ---------- */
+  #reactPad {
+    height:300px; border-radius:26px; display:flex; flex-direction:column; gap:8px;
+    align-items:center; justify-content:center; cursor:pointer; text-align:center; padding:20px;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14);
+    backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+    transition:background .12s;
+  }
+  #reactPad.wait { background:rgba(244,63,94,.28); border-color:rgba(244,63,94,.5); }
+  #reactPad.go   { background:rgba(16,185,129,.4);  border-color:rgba(16,185,129,.7); }
+  #reactMain { font-size:26px; font-weight:700; }
+  #reactSub  { font-size:14px; opacity:.6; }
+
+  /* ---------- Pasos ---------- */
+  .note { font-size:12.5px; line-height:1.5; opacity:.55; margin-top:14px; }
+  #stepDot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#64748b; margin-right:7px; vertical-align:2px; }
+  #stepDot.on { background:#34d399; box-shadow:0 0 10px #34d399; animation:pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity:.45; } }
+
+  /* ---------- Tiempo ---------- */
+  .seg { display:flex; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:4px; margin-bottom:16px; }
+  .seg button { flex:1; padding:10px; border:none; border-radius:12px; background:transparent; color:#eef2ff; font-size:14px; font-weight:600; cursor:pointer; opacity:.6; }
+  .seg button.sel { background:rgba(255,255,255,.14); opacity:1; box-shadow:inset 0 1px 0 rgba(255,255,255,.15); }
+  .subview { display:none; } .subview.active { display:block; }
+  #clockBig { font-size:64px; font-weight:100; text-align:center; font-variant-numeric:tabular-nums; letter-spacing:2px; padding:24px 0 4px; }
+  #clockDate { text-align:center; opacity:.6; font-size:16px; text-transform:capitalize; padding-bottom:20px; }
+  #laps { list-style:none; margin-top:14px; max-height:180px; overflow-y:auto; }
+  #laps li { display:flex; justify-content:space-between; padding:9px 6px; border-bottom:1px solid rgba(255,255,255,.08); font-variant-numeric:tabular-nums; font-size:15px; }
+  #laps li span:first-child { opacity:.5; }
+
+  .stepper { display:flex; align-items:center; justify-content:center; gap:18px; margin:10px 0 18px; }
+  .stepper .val { font-size:44px; font-weight:200; font-variant-numeric:tabular-nums; min-width:78px; text-align:center; }
+  .stepper button {
+    width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.2);
+    background:rgba(255,255,255,.09); color:#fff; font-size:24px; cursor:pointer; line-height:1;
+  }
+  .stepper button:active { background:rgba(255,255,255,.2); }
+  .stepper label { font-size:11px; opacity:.5; text-transform:uppercase; letter-spacing:1px; display:block; text-align:center; margin-top:4px; }
+
+  #timerRingWrap { position:relative; width:220px; height:220px; margin:6px auto; display:none; }
+  #timerRingWrap svg { transform:rotate(-90deg); }
+  #timerRingWrap .ringbg { stroke:rgba(255,255,255,.1); }
+  #timerRingWrap .ringfg { stroke:url(#grad); stroke-linecap:round; transition:stroke-dashoffset .3s linear; }
+  #timerDisplay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:42px; font-weight:200; font-variant-numeric:tabular-nums; }
+
+  /* ---------- Nav ---------- */
+  nav {
+    display:flex; margin:0 14px; margin-bottom:calc(env(safe-area-inset-bottom, 0px) + 12px);
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
+    border-radius:24px; padding:6px;
+    backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%);
+    box-shadow:0 8px 30px rgba(0,0,0,.4);
+  }
+  nav button {
+    flex:1; padding:9px 2px 7px; border:none; background:transparent; color:#eef2ff;
+    border-radius:18px; cursor:pointer; opacity:.5; transition:all .2s;
+    display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; font-weight:600; letter-spacing:.4px;
+  }
+  nav button svg { width:22px; height:22px; }
+  nav button.sel { opacity:1; background:rgba(255,255,255,.13); box-shadow:inset 0 1px 0 rgba(255,255,255,.14); }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position:fixed; left:50%; bottom:110px; transform:translateX(-50%) translateY(20px);
+    background:rgba(20,25,45,.9); border:1px solid rgba(255,255,255,.2); color:#fff;
+    padding:12px 20px; border-radius:16px; font-size:14px; opacity:0; pointer-events:none;
+    transition:all .3s; z-index:50; max-width:86vw; text-align:center;
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="bg"><div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div></div>
+
+<div id="app">
+  <header>
+    <h1>Zen<span> · entrenamiento</span></h1>
+    <div id="miniClock">--:--</div>
+  </header>
+
+  <main>
+    <!-- ============ MEDITACIÓN ============ -->
+    <section id="view-med" class="view active">
+      <div class="glass" id="medSetup">
+        <h2>Duración</h2>
+        <div class="chips" id="medDur">
+          <button class="chip" data-min="1">1 min</button>
+          <button class="chip sel" data-min="3">3 min</button>
+          <button class="chip" data-min="5">5 min</button>
+          <button class="chip" data-min="10">10 min</button>
+        </div>
+        <h2 style="margin-top:20px">Respiración</h2>
+        <div class="chips" id="medPat">
+          <button class="chip sel" data-pat="calm">Calma 4·6</button>
+          <button class="chip" data-pat="box">Caja 4·4·4·4</button>
+          <button class="chip" data-pat="478">Dormir 4·7·8</button>
+        </div>
+        <div style="height:20px"></div>
+        <button class="btn" id="medStart">Comenzar sesión</button>
+        <div class="statgrid">
+          <div class="stat"><b id="stSessions">0</b><span>sesiones</span></div>
+          <div class="stat"><b id="stMinutes">0</b><span>minutos</span></div>
+          <div class="stat"><b id="stStreak">0</b><span>racha días</span></div>
+        </div>
+      </div>
+
+      <div class="glass" id="medActive" style="display:none">
+        <div id="breathWrap">
+          <div id="breathCircle">
+            <div id="breathPhase">Prepárate</div>
+            <div id="breathCount"></div>
+          </div>
+          <div id="medRemaining">--:--</div>
+        </div>
+        <div style="height:16px"></div>
+        <button class="btn stop" id="medStop">Terminar</button>
+      </div>
+    </section>
+
+    <!-- ============ REACCIÓN ============ -->
+    <section id="view-react" class="view">
+      <div id="reactPad">
+        <div id="reactMain">Toca para empezar</div>
+        <div id="reactSub">5 rondas · toca cuando se ponga verde</div>
+      </div>
+      <div class="glass" style="margin-top:14px">
+        <div class="statgrid" style="margin-top:0">
+          <div class="stat"><b id="rxLast">—</b><span>última</span></div>
+          <div class="stat"><b id="rxAvg">—</b><span>promedio</span></div>
+          <div class="stat"><b id="rxBest">—</b><span>récord</span></div>
+        </div>
+        <p class="note">El tiempo de reacción visual típico de un adulto es de 200–300 ms. Entrenar regularmente mejora la atención sostenida.</p>
+      </div>
+    </section>
+
+    <!-- ============ PASOS ============ -->
+    <section id="view-steps" class="view">
+      <div class="glass">
+        <h2><span id="stepDot"></span>Podómetro · hoy</h2>
+        <div class="bignum" id="stepCount">0</div>
+        <div class="sub" id="stepDist">≈ 0 m recorridos</div>
+        <div style="height:18px"></div>
+        <button class="btn" id="stepBtn">Iniciar conteo</button>
+        <div class="statgrid">
+          <div class="stat"><b id="stepTotal">0</b><span>total histórico</span></div>
+          <div class="stat"><b id="stepKcal">0</b><span>kcal aprox.</span></div>
+        </div>
+        <p class="note" id="stepNote">
+          Privacidad total: los pasos se detectan con el acelerómetro del teléfono y nunca salen de tu dispositivo.
+          Mientras el conteo está activo la pantalla se mantiene encendida (puedes bajar el brillo al mínimo):
+          los navegadores no permiten leer sensores con el teléfono bloqueado. Si cierras la app, tu conteo queda guardado.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ TIEMPO ============ -->
+    <section id="view-time" class="view">
+      <div class="seg" id="timeSeg">
+        <button data-sub="clock" class="sel">Reloj</button>
+        <button data-sub="stopwatch">Cronómetro</button>
+        <button data-sub="timer">Temporizador</button>
+      </div>
+
+      <div class="subview active" id="sub-clock">
+        <div class="glass">
+          <div id="clockBig">--:--:--</div>
+          <div id="clockDate"></div>
+        </div>
+      </div>
+
+      <div class="subview" id="sub-stopwatch">
+        <div class="glass">
+          <div class="bignum" id="swDisplay">00:00<span style="font-size:.5em;opacity:.6">.00</span></div>
+          <div style="height:18px"></div>
+          <div class="row">
+            <button class="btn" id="swMain">Iniciar</button>
+            <button class="btn ghost" id="swLap" disabled>Vuelta</button>
+          </div>
+          <ul id="laps"></ul>
+        </div>
+      </div>
+
+      <div class="subview" id="sub-timer">
+        <div class="glass">
+          <div id="timerSetup">
+            <div class="chips" id="timerPresets" style="justify-content:center">
+              <button class="chip" data-s="60">1 min</button>
+              <button class="chip" data-s="300">5 min</button>
+              <button class="chip" data-s="600">10 min</button>
+              <button class="chip" data-s="900">15 min</button>
+            </div>
+            <div class="stepper">
+              <div>
+                <div style="display:flex;align-items:center;gap:14px">
+                  <button id="tmMinDn">−</button><div class="val" id="tmMin">05</div><button id="tmMinUp">+</button>
+                </div>
+                <label>minutos</label>
+              </div>
+              <div>
+                <div style="display:flex;align-items:center;gap:14px">
+                  <button id="tmSecDn">−</button><div class="val" id="tmSec">00</div><button id="tmSecUp">+</button>
+                </div>
+                <label>segundos</label>
+              </div>
+            </div>
+          </div>
+          <div id="timerRingWrap">
+            <svg width="220" height="220" viewBox="0 0 220 220">
+              <defs>
+                <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#5b6cff"/><stop offset="100%" stop-color="#a855f7"/>
+                </linearGradient>
+              </defs>
+              <circle class="ringbg" cx="110" cy="110" r="98" fill="none" stroke-width="10"/>
+              <circle class="ringfg" id="ringFg" cx="110" cy="110" r="98" fill="none" stroke-width="10"/>
+            </svg>
+            <div id="timerDisplay">--:--</div>
+          </div>
+          <div style="height:14px"></div>
+          <div class="row">
+            <button class="btn" id="tmMain">Iniciar</button>
+            <button class="btn ghost" id="tmReset" style="display:none">Reiniciar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav id="nav">
+    <button data-view="med" class="sel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="6" r="2.6"/><path d="M12 9v5m0 0-5 4m5-4 5 4M5.5 13.5 9 12m9.5 1.5L15 12"/></svg>
+      Meditar
+    </button>
+    <button data-view="react">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2z"/></svg>
+      Reacción
+    </button>
+    <button data-view="steps">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20h4M14 16h4M7 4c1.8 0 3 1.4 3 3.5S9 12 8 13.5 7 17 7 17M17 2c-1.8 1-2.4 2.6-2 4.5.4 2 .3 3.5-.7 5"/></svg>
+      Pasos
+    </button>
+    <button data-view="time">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+      Tiempo
+    </button>
+  </nav>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ==========================================================================
+   Zen · Entrenamiento — app 100% local y privada.
+   Sin red, sin analítica, sin cuentas. Todos los datos viven en localStorage.
+   ========================================================================== */
+
+const $ = (id) => document.getElementById(id);
+
+/* ---------- Almacenamiento seguro (soporta modo privado sin storage) ---- */
+const store = {
+  get(k, def) {
+    try { const v = localStorage.getItem("zen:" + k); return v === null ? def : JSON.parse(v); }
+    catch { return def; }
+  },
+  set(k, v) { try { localStorage.setItem("zen:" + k, JSON.stringify(v)); } catch {} }
+};
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
+const pad = (n) => String(n).padStart(2, "0");
+const fmtMMSS = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return pad(Math.floor(s / 60)) + ":" + pad(s % 60); };
+
+function toast(msg, time = 2600) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), time);
+}
+
+function vibrate(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {} }
+
+/* ---------- Audio (WebAudio, sin archivos externos) --------------------- */
+let audioCtx = null;
+function ensureAudio() {
+  try {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  } catch {}
+}
+function chime(freq = 528, dur = 1.2, vol = 0.18) {
+  try {
+    if (!audioCtx) return;
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  } catch {}
+}
+// Desbloquear audio con el primer gesto (requisito de iOS/Android)
+document.addEventListener("pointerdown", ensureAudio, { once: true });
+
+/* ---------- Navegación --------------------------------------------------- */
+$("nav").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-view]");
+  if (!b) return;
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("sel", x === b));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + b.dataset.view));
+});
+
+/* =========================================================================
+   1) MEDITACIÓN — guía de respiración con fases temporizadas
+   ========================================================================= */
+const PATTERNS = {
+  calm: [["Inhala", 4], ["Exhala", 6]],
+  box:  [["Inhala", 4], ["Sostén", 4], ["Exhala", 4], ["Sostén", 4]],
+  "478":[["Inhala", 4], ["Sostén", 7], ["Exhala", 8]]
+};
+let med = { running: false, endAt: 0, pattern: "calm", minutes: 3, phaseTimer: 0, tick: 0 };
+
+function chipGroup(containerId, attr, onSel) {
+  $(containerId).addEventListener("click", (e) => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    $(containerId).querySelectorAll(".chip").forEach(x => x.classList.toggle("sel", x === c));
+    onSel(c.dataset[attr]);
+  });
+}
+chipGroup("medDur", "min", v => med.minutes = +v);
+chipGroup("medPat", "pat", v => med.pattern = v);
+
+function renderMedStats() {
+  const s = store.get("med", { sessions: 0, minutes: 0, streak: 0, last: "" });
+  $("stSessions").textContent = s.sessions;
+  $("stMinutes").textContent = Math.round(s.minutes);
+  $("stStreak").textContent = s.streak;
+}
+
+function medPhaseLoop() {
+  if (!med.running) return;
+  const steps = PATTERNS[med.pattern];
+  const [name, secs] = steps[med.stepIdx % steps.length];
+  med.stepIdx++;
+  $("breathPhase").textContent = name;
+  const circle = $("breathCircle");
+  circle.style.transition = `transform ${secs}s cubic-bezier(.4,0,.4,1)`;
+  circle.style.transform = name === "Inhala" ? "scale(1)" : (name === "Exhala" ? "scale(.72)" : circle.style.transform);
+  vibrate(30);
+  let left = secs;
+  $("breathCount").textContent = left;
+  clearInterval(med.countInt);
+  med.countInt = setInterval(() => {
+    left--;
+    if (left > 0) $("breathCount").textContent = left;
+  }, 1000);
+  med.phaseTimer = setTimeout(medPhaseLoop, secs * 1000);
+}
+
+function medFinish(completed) {
+  med.running = false;
+  clearTimeout(med.phaseTimer); clearInterval(med.countInt); clearInterval(med.tick);
+  releaseWakeLock("med");
+  if (completed) {
+    chime(432, 2.2); setTimeout(() => chime(528, 2.4), 350);
+    vibrate([120, 80, 120]);
+    const s = store.get("med", { sessions: 0, minutes: 0, streak: 0, last: "" });
+    s.sessions++; s.minutes += med.minutes;
+    const today = todayKey();
+    if (s.last !== today) {
+      const y = new Date(); y.setDate(y.getDate() - 1);
+      s.streak = (s.last === y.toISOString().slice(0, 10)) ? s.streak + 1 : 1;
+      s.last = today;
+    }
+    store.set("med", s);
+    renderMedStats();
+    toast("Sesión completada 🌿 Bien hecho.");
+  }
+  $("medActive").style.display = "none";
+  $("medSetup").style.display = "block";
+}
+
+$("medStart").addEventListener("click", () => {
+  ensureAudio();
+  med.running = true;
+  med.stepIdx = 0;
+  med.endAt = Date.now() + med.minutes * 60000;
+  $("medSetup").style.display = "none";
+  $("medActive").style.display = "block";
+  $("medRemaining").textContent = fmtMMSS(med.minutes * 60000);
+  requestWakeLock("med");
+  chime(432, 1.4);
+  setTimeout(() => { if (med.running) medPhaseLoop(); }, 900);
+  med.tick = setInterval(() => {
+    const left = med.endAt - Date.now();
+    $("medRemaining").textContent = fmtMMSS(left);
+    if (left <= 0) medFinish(true);
+  }, 250);
+});
+$("medStop").addEventListener("click", () => medFinish(false));
+renderMedStats();
+
+/* =========================================================================
+   2) TIEMPO DE REACCIÓN — 5 rondas, promedio y récord
+   ========================================================================= */
+const rx = { state: "idle", t0: 0, timeout: 0, results: [], ROUNDS: 5 };
+
+function rxRender(main, sub) { $("reactMain").textContent = main; $("reactSub").textContent = sub; }
+function rxUpdateStats() {
+  const best = store.get("rxBest", null);
+  $("rxBest").textContent = best ? best + " ms" : "—";
+}
+function rxArm() {
+  rx.state = "wait";
+  $("reactPad").className = "wait";
+  rxRender("Espera…", `Ronda ${rx.results.length + 1} de ${rx.ROUNDS} · toca al ver verde`);
+  rx.timeout = setTimeout(() => {
+    rx.state = "go";
+    rx.t0 = performance.now();
+    $("reactPad").className = "go";
+    rxRender("¡TOCA!", "");
+  }, 1500 + Math.random() * 2500);
+}
+$("reactPad").addEventListener("pointerdown", () => {
+  ensureAudio();
+  if (rx.state === "idle") {
+    rx.results = [];
+    rxArm();
+  } else if (rx.state === "wait") {
+    clearTimeout(rx.timeout);
+    vibrate(80);
+    $("reactPad").className = "";
+    rxRender("Muy pronto 😅", "Toca para reintentar la ronda");
+    rx.state = "early";
+  } else if (rx.state === "early") {
+    rxArm();
+  } else if (rx.state === "go") {
+    const ms = Math.round(performance.now() - rx.t0);
+    rx.results.push(ms);
+    $("rxLast").textContent = ms + " ms";
+    vibrate(25);
+    const best = store.get("rxBest", null);
+    if (!best || ms < best) { store.set("rxBest", ms); rxUpdateStats(); }
+    if (rx.results.length >= rx.ROUNDS) {
+      const avg = Math.round(rx.results.reduce((a, b) => a + b, 0) / rx.results.length);
+      $("rxAvg").textContent = avg + " ms";
+      $("reactPad").className = "";
+      rxRender(`Promedio: ${avg} ms`, "Toca para jugar de nuevo");
+      rx.state = "idle";
+      chime(660, .5);
+    } else {
+      $("reactPad").className = "";
+      rxRender(ms + " ms", "Toca para la siguiente ronda");
+      rx.state = "next";
+    }
+  } else if (rx.state === "next") {
+    rxArm();
+  }
+});
+rxUpdateStats();
+
+/* =========================================================================
+   3) PODÓMETRO — acelerómetro + detección de picos + Wake Lock
+   ========================================================================= */
+const ped = {
+  active: false, steps: 0, total: 0,
+  gravity: { x: 0, y: 0, z: 0 }, lastStepAt: 0, lastMag: 0, rising: false,
+  ALPHA: 0.8, THRESHOLD: 1.8, MIN_STEP_MS: 280
+};
+
+function pedLoad() {
+  const d = store.get("steps", { day: todayKey(), today: 0, total: 0 });
+  if (d.day !== todayKey()) { d.day = todayKey(); d.today = 0; store.set("steps", d); }
+  ped.steps = d.today; ped.total = d.total;
+  pedRender();
+}
+function pedSave() {
+  store.set("steps", { day: todayKey(), today: ped.steps, total: ped.total });
+}
+function pedRender() {
+  $("stepCount").textContent = ped.steps.toLocaleString("es");
+  $("stepTotal").textContent = ped.total.toLocaleString("es");
+  $("stepDist").textContent = "≈ " + Math.round(ped.steps * 0.74).toLocaleString("es") + " m recorridos";
+  $("stepKcal").textContent = Math.round(ped.steps * 0.04);
+}
+
+function onMotion(e) {
+  if (!ped.active) return;
+  ped.gotData = true;
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x === null) return;
+  // Filtro paso-bajo para aislar la gravedad y quedarnos con el movimiento
+  const g = ped.gravity, A = ped.ALPHA;
+  g.x = A * g.x + (1 - A) * a.x;
+  g.y = A * g.y + (1 - A) * a.y;
+  g.z = A * g.z + (1 - A) * a.z;
+  const lx = a.x - g.x, ly = a.y - g.y, lz = a.z - g.z;
+  const mag = Math.sqrt(lx * lx + ly * ly + lz * lz);
+  const now = Date.now();
+  // Detección de pico: cruce ascendente del umbral con separación mínima entre pasos
+  if (mag > ped.THRESHOLD && !ped.rising && now - ped.lastStepAt > ped.MIN_STEP_MS) {
+    ped.rising = true;
+    ped.lastStepAt = now;
+    ped.steps++; ped.total++;
+    pedRender();
+    if (ped.steps % 20 === 0) pedSave();
+  } else if (mag < ped.THRESHOLD * 0.6) {
+    ped.rising = false;
+  }
+}
+
+async function pedStart() {
+  if (typeof DeviceMotionEvent === "undefined") {
+    toast("Este dispositivo no expone acelerómetro al navegador. Prueba desde un teléfono.");
+    return;
+  }
+  // iOS 13+ exige pedir permiso desde un gesto del usuario
+  if (typeof DeviceMotionEvent.requestPermission === "function") {
+    try {
+      const r = await DeviceMotionEvent.requestPermission();
+      if (r !== "granted") { toast("Permiso de movimiento denegado."); return; }
+    } catch { toast("No se pudo pedir permiso de movimiento. Abre la app con https."); return; }
+  }
+  ped.active = true;
+  ped.gotData = false;
+  window.addEventListener("devicemotion", onMotion);
+  // Si en 4 s no llega ningún dato de movimiento, avisar (p. ej. en un PC)
+  clearTimeout(ped.probeT);
+  ped.probeT = setTimeout(() => {
+    if (ped.active && !ped.gotData) toast("No se detecta acelerómetro en este dispositivo. Abre la app desde tu teléfono para contar pasos.", 4000);
+  }, 4000);
+  await requestWakeLock("ped");
+  $("stepBtn").textContent = "Pausar conteo";
+  $("stepBtn").classList.add("stop");
+  $("stepDot").classList.add("on");
+  toast("Contando pasos. Mantén la pantalla encendida (puedes bajar el brillo).", 3500);
+}
+function pedStop() {
+  ped.active = false;
+  window.removeEventListener("devicemotion", onMotion);
+  releaseWakeLock("ped");
+  pedSave();
+  $("stepBtn").textContent = "Iniciar conteo";
+  $("stepBtn").classList.remove("stop");
+  $("stepDot").classList.remove("on");
+}
+$("stepBtn").addEventListener("click", () => ped.active ? pedStop() : pedStart());
+pedLoad();
+
+/* ---------- Wake Lock compartido (meditación y podómetro) --------------- */
+const wakeLocks = { holders: new Set(), sentinel: null };
+async function requestWakeLock(who) {
+  wakeLocks.holders.add(who);
+  try {
+    if ("wakeLock" in navigator && !wakeLocks.sentinel) {
+      wakeLocks.sentinel = await navigator.wakeLock.request("screen");
+      wakeLocks.sentinel.addEventListener("release", () => { wakeLocks.sentinel = null; });
+    }
+  } catch {}
+}
+function releaseWakeLock(who) {
+  wakeLocks.holders.delete(who);
+  if (!wakeLocks.holders.size && wakeLocks.sentinel) {
+    try { wakeLocks.sentinel.release(); } catch {}
+    wakeLocks.sentinel = null;
+  }
+}
+// Al volver de segundo plano, reactivar el wake lock si sigue haciendo falta
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && wakeLocks.holders.size) {
+    const h = wakeLocks.holders.values().next().value;
+    requestWakeLock(h);
+  }
+  if (document.visibilityState === "hidden") pedSave();
+});
+window.addEventListener("pagehide", pedSave);
+
+/* =========================================================================
+   4) RELOJ — hora y fecha en vivo
+   ========================================================================= */
+function tickClock() {
+  const d = new Date();
+  const hms = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  $("clockBig").textContent = hms;
+  $("miniClock").textContent = hms.slice(0, 5);
+  try {
+    $("clockDate").textContent = d.toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  } catch {
+    $("clockDate").textContent = d.toDateString();
+  }
+}
+setInterval(tickClock, 1000); tickClock();
+
+/* ---------- Sub-navegación de Tiempo ------------------------------------ */
+$("timeSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-sub]"); if (!b) return;
+  document.querySelectorAll("#timeSeg button").forEach(x => x.classList.toggle("sel", x === b));
+  document.querySelectorAll(".subview").forEach(v => v.classList.toggle("active", v.id === "sub-" + b.dataset.sub));
+});
+
+/* =========================================================================
+   5) CRONÓMETRO — basado en timestamps (exacto aunque el móvil se duerma)
+   ========================================================================= */
+const sw = { running: false, startAt: 0, acc: 0, raf: 0, lastLap: 0, laps: 0 };
+function swFmt(ms) {
+  const cs = Math.floor((ms % 1000) / 10);
+  const s = Math.floor(ms / 1000);
+  return `${pad(Math.floor(s / 60))}:${pad(s % 60)}<span style="font-size:.5em;opacity:.6">.${pad(cs)}</span>`;
+}
+function swElapsed() { return sw.acc + (sw.running ? Date.now() - sw.startAt : 0); }
+function swFrame() {
+  $("swDisplay").innerHTML = swFmt(swElapsed());
+  if (sw.running) sw.raf = requestAnimationFrame(swFrame);
+}
+$("swMain").addEventListener("click", () => {
+  if (!sw.running) {
+    sw.running = true;
+    sw.startAt = Date.now();
+    $("swMain").textContent = "Pausar";
+    $("swMain").classList.add("stop");
+    $("swLap").disabled = false;
+    $("swLap").textContent = "Vuelta";
+    swFrame();
+  } else {
+    sw.running = false;
+    sw.acc += Date.now() - sw.startAt;
+    cancelAnimationFrame(sw.raf);
+    $("swMain").textContent = "Continuar";
+    $("swMain").classList.remove("stop");
+    $("swLap").textContent = "Borrar";
+    swFrame();
+  }
+});
+$("swLap").addEventListener("click", () => {
+  if (sw.running) {
+    const t = swElapsed();
+    sw.laps++;
+    const li = document.createElement("li");
+    li.innerHTML = `<span>Vuelta ${sw.laps}</span><span>+${fmtMMSS(t - sw.lastLap)}</span><span>${fmtMMSS(t)}</span>`;
+    $("laps").prepend(li);
+    sw.lastLap = t;
+  } else {
+    sw.acc = 0; sw.lastLap = 0; sw.laps = 0;
+    $("laps").innerHTML = "";
+    $("swDisplay").innerHTML = swFmt(0);
+    $("swMain").textContent = "Iniciar";
+    $("swLap").disabled = true;
+    $("swLap").textContent = "Vuelta";
+  }
+});
+
+/* =========================================================================
+   6) TEMPORIZADOR — sobrevive al standby y a recargas (endTime persistido)
+   ========================================================================= */
+const RING_C = 2 * Math.PI * 98;
+$("ringFg").style.strokeDasharray = RING_C;
+const tm = { endAt: 0, totalMs: 0, running: false, int: 0, min: 5, sec: 0, alarmInt: 0 };
+
+function tmRenderSetup() { $("tmMin").textContent = pad(tm.min); $("tmSec").textContent = pad(tm.sec); }
+function tmAdj(dm, ds) {
+  tm.min = Math.min(99, Math.max(0, tm.min + dm));
+  tm.sec = (tm.sec + ds + 60) % 60;
+  if (tm.min === 0 && tm.sec === 0) tm.sec = 10;
+  tmRenderSetup();
+}
+$("tmMinUp").addEventListener("click", () => tmAdj(1, 0));
+$("tmMinDn").addEventListener("click", () => tmAdj(-1, 0));
+$("tmSecUp").addEventListener("click", () => tmAdj(0, 5));
+$("tmSecDn").addEventListener("click", () => tmAdj(0, -5));
+$("timerPresets").addEventListener("click", (e) => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  tm.min = Math.floor(+c.dataset.s / 60); tm.sec = +c.dataset.s % 60;
+  tmRenderSetup();
+});
+
+function tmShow(runningUI) {
+  $("timerSetup").style.display = runningUI ? "none" : "block";
+  $("timerRingWrap").style.display = runningUI ? "block" : "none";
+  $("tmReset").style.display = runningUI ? "block" : "none";
+}
+function tmTick() {
+  const left = tm.endAt - Date.now();
+  if (left <= 0) { tmDone(); return; }
+  $("timerDisplay").textContent = fmtMMSS(left);
+  $("ringFg").style.strokeDashoffset = RING_C * (1 - left / tm.totalMs);
+}
+function tmStart(ms) {
+  ensureAudio();
+  tm.totalMs = ms;
+  tm.endAt = Date.now() + ms;
+  tm.running = true;
+  store.set("timer", { endAt: tm.endAt, totalMs: tm.totalMs });
+  tmShow(true);
+  $("tmMain").textContent = "Cancelar";
+  $("tmMain").classList.add("stop");
+  clearInterval(tm.int);
+  tm.int = setInterval(tmTick, 200);
+  tmTick();
+}
+function tmStopAlarm() {
+  clearInterval(tm.alarmInt); tm.alarmInt = 0;
+  vibrate(0);
+}
+function tmCancel() {
+  tm.running = false;
+  clearInterval(tm.int);
+  tmStopAlarm();
+  store.set("timer", null);
+  tmShow(false);
+  $("tmMain").textContent = "Iniciar";
+  $("tmMain").classList.remove("stop");
+}
+function tmDone() {
+  tm.running = false;
+  clearInterval(tm.int);
+  store.set("timer", null);
+  $("timerDisplay").textContent = "00:00";
+  $("ringFg").style.strokeDashoffset = RING_C;
+  vibrate([300, 150, 300, 150, 500]);
+  let n = 0;
+  tmStopAlarm();
+  tm.alarmInt = setInterval(() => {
+    chime(880, .35, .22); setTimeout(() => chime(660, .3, .2), 180);
+    if (++n >= 8) tmStopAlarm();
+  }, 900);
+  chime(880, .35, .22);
+  $("tmMain").textContent = "Listo ✓";
+  $("tmMain").classList.remove("stop");
+  toast("⏰ ¡Tiempo cumplido!");
+}
+$("tmMain").addEventListener("click", () => {
+  if (tm.running) { tmCancel(); return; }
+  if (tm.alarmInt || $("tmMain").textContent === "Listo ✓") { tmStopAlarm(); tmCancel(); return; }
+  const ms = (tm.min * 60 + tm.sec) * 1000;
+  if (ms < 1000) { toast("Elige una duración."); return; }
+  tmStart(ms);
+});
+$("tmReset").addEventListener("click", tmCancel);
+tmRenderSetup();
+
+// Restaurar un temporizador que quedó corriendo (recarga o standby largo)
+(function tmRestore() {
+  const saved = store.get("timer", null);
+  if (saved && saved.endAt) {
+    if (saved.endAt > Date.now()) {
+      tm.totalMs = saved.totalMs; tm.endAt = saved.endAt; tm.running = true;
+      tmShow(true);
+      $("tmMain").textContent = "Cancelar"; $("tmMain").classList.add("stop");
+      tm.int = setInterval(tmTick, 200);
+      tmTick();
+      // Llevar al usuario a la vista del temporizador
+      document.querySelector('nav button[data-view="time"]').click();
+      document.querySelector('#timeSeg button[data-sub="timer"]').click();
+    } else {
+      store.set("timer", null);
+      toast("⏰ Tu temporizador terminó mientras la app estaba cerrada.");
+    }
+  }
+})();
+
+// Al despertar de standby, recalcular inmediatamente (los intervalos se congelan)
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    if (tm.running) tmTick();
+    if (med.running && med.endAt - Date.now() <= 0) medFinish(true);
+    if (sw.running) swFrame();
+  }
+});
+
+/* ---------- Robustez global --------------------------------------------- */
+window.addEventListener("error", (e) => { console.error(e); });
+// Evitar zoom por doble toque en iOS
+let lastTouch = 0;
+document.addEventListener("touchend", (e) => {
+  const now = Date.now();
+  if (now - lastTouch < 350) e.preventDefault();
+  lastTouch = now;
+}, { passive: false });
+</script>
+</body>
+</html>
