@@ -212,6 +212,36 @@
   .calcOpts { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .calcOpts button { padding:17px; border-radius:16px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); color:#fff; font-size:20px; font-weight:700; cursor:pointer; font-variant-numeric:tabular-nums; }
 
+  /* ---- Aprender ---- */
+  .tin {
+    width:100%; padding:12px 14px; border-radius:14px; margin-bottom:9px;
+    border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.07);
+    color:inherit; font-size:14.5px; font-family:inherit;
+    user-select:text; -webkit-user-select:text;
+  }
+  .tin:focus { outline:none; border-color:var(--accA); }
+  body.light .tin { background:rgba(40,55,110,.06); border-color:rgba(35,45,90,.16); }
+  #revQ { font-size:19px; font-weight:600; line-height:1.45; padding:12px 0 4px; }
+  #revA { font-size:15.5px; line-height:1.55; opacity:.88; padding:12px 0 4px; border-top:1px dashed rgba(255,255,255,.2); margin-top:12px; }
+  .grades { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px; }
+  .grades button {
+    padding:11px 2px; border-radius:14px; border:1px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.08); color:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .grades button small { display:block; font-weight:400; opacity:.55; font-size:10px; margin-top:2px; }
+  .grades .g0 { border-color:rgba(244,63,94,.55); }
+  .grades .g3 { border-color:rgba(16,185,129,.55); }
+  body.light .grades button { background:rgba(40,55,110,.07); }
+  .cardRow { display:flex; align-items:center; gap:8px; padding:9px 2px; border-bottom:1px solid rgba(255,255,255,.08); font-size:13.5px; }
+  body.light .cardRow { border-color:rgba(35,45,90,.1); }
+  .cardRow span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cardRow small { opacity:.5; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .cardRow button { background:none; border:none; color:#fb7185; font-size:16px; cursor:pointer; padding:2px 6px; }
+  #cardList { max-height:280px; overflow-y:auto; margin-top:8px; }
+  #forgetCv { width:100%; height:150px; display:block; }
+  .palSt { font-size:13.5px; padding:7px 2px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; gap:8px; }
+  .palSt b { opacity:.8; }
+
   /* ---- Pasos ---- */
   #stepRingWrap { position:relative; width:210px; height:210px; margin:4px auto; }
   #stepRingWrap svg { transform:rotate(-90deg); }
@@ -492,6 +522,61 @@
       </div>
     </section>
 
+    <!-- ============ APRENDER ============ -->
+    <section id="view-learn" class="view">
+      <div class="glass">
+        <h2>Repaso de hoy</h2>
+        <div id="revHome">
+          <div class="bignum" id="lrnDue">0</div>
+          <div class="sub" id="lrnDueSub">tarjetas por repasar</div>
+          <div style="height:16px"></div>
+          <button class="btn" id="startRev">Repasar ahora</button>
+          <div class="statgrid">
+            <div class="stat"><b id="lrnTotal">0</b><span>tarjetas</span></div>
+            <div class="stat"><b id="lrnMaster">0</b><span>dominadas</span></div>
+            <div class="stat"><b id="lrnRet">—</b><span>retención</span></div>
+          </div>
+        </div>
+        <div id="revBox" style="display:none">
+          <div class="gameHud"><span id="revCat"></span><span id="revLeft"></span></div>
+          <div id="revQ"></div>
+          <div id="revA" style="display:none"></div>
+          <div style="height:12px"></div>
+          <button class="btn" id="revShow">Mostrar respuesta</button>
+          <div class="grades" id="revGrades" style="display:none">
+            <button class="g0" data-g="0">Otra vez<small id="ivl0"></small></button>
+            <button data-g="1">Difícil<small id="ivl1"></small></button>
+            <button data-g="2">Bien<small id="ivl2"></small></button>
+            <button class="g3" data-g="3">Fácil<small id="ivl3"></small></button>
+          </div>
+          <div style="height:10px"></div>
+          <button class="btn ghost small" id="revQuit">Terminar repaso</button>
+        </div>
+      </div>
+
+      <div class="glass">
+        <h2>Tu curva del olvido</h2>
+        <canvas id="forgetCv"></canvas>
+        <p class="note" id="forgetNote">Sin repasar, la memoria decae exponencialmente (Ebbinghaus): ~50% en un día. Cada repaso en el momento justo aplana tu curva y multiplica el intervalo hasta el siguiente. La línea muestra la retención media proyectada de tus tarjetas para los próximos 30 días si no repasaras.</p>
+      </div>
+
+      <div class="glass">
+        <h2>Añadir tarjeta</h2>
+        <input class="tin" id="addQ" placeholder="Pregunta (ej. ¿Ritmo de compresiones en RCP?)" maxlength="200">
+        <input class="tin" id="addA" placeholder="Respuesta" maxlength="400">
+        <div class="row">
+          <button class="btn small" id="addBtn">Guardar tarjeta</button>
+          <button class="btn ghost small" id="manageBtn">Gestionar</button>
+        </div>
+        <div id="cardList" style="display:none"></div>
+      </div>
+
+      <div class="glass">
+        <h2>Palacio de memoria</h2>
+        <div id="palBox"></div>
+      </div>
+    </section>
+
     <!-- ============ PASOS ============ -->
     <section id="view-steps" class="view">
       <div class="glass">
@@ -743,6 +828,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3A5.5 5.5 0 0 0 4 8.5c0 1.2.3 2.2 1 3.1-.7.9-1 2-1 3.1A5.3 5.3 0 0 0 9.3 20h.2M9.5 3c1.4 0 2.5 1.1 2.5 2.5V18c0 1.1-.9 2-2 2M9.5 3c.1 0 .3 0 .4 0M14.5 3A5.5 5.5 0 0 1 20 8.5c0 1.2-.3 2.2-1 3.1.7.9 1 2 1 3.1A5.3 5.3 0 0 1 14.7 20h-.2M14.5 3C13.1 3 12 4.1 12 5.5"/></svg>
       Mente
     </button>
+    <button data-view="learn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15.5H6.5A2.5 2.5 0 0 0 4 21V5.5zM4 18.5A2.5 2.5 0 0 1 6.5 16H20"/></svg>
+      Aprender
+    </button>
     <button data-view="steps">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20h4M14 16h4M7 4c1.8 0 3 1.4 3 3.5S9 12 8 13.5 7 17 7 17M17 2c-1.8 1-2.4 2.6-2 4.5.4 2 .3 3.5-.7 5"/></svg>
       Pasos
@@ -892,8 +981,9 @@ $("nav").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-view]"); if (!b) return;
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("sel", x === b));
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + b.dataset.view));
-  // El lienzo del gráfico solo tiene ancho cuando la vista es visible
+  // Los lienzos de gráficos solo tienen ancho cuando su vista es visible
   if (b.dataset.view === "mind") requestAnimationFrame(() => drawChart());
+  if (b.dataset.view === "learn") renderLearn();
 });
 
 /* =========================================================================
@@ -1003,6 +1093,7 @@ function medFinish(completed) {
     store.set("med", s);
     renderMedStats();
     toast("Sesión completada 🌿 Bien hecho.");
+    chDayCheck(false); // la meditación puede cerrar el día de un reto combinado
   }
   $("medActive").style.display = "none";
   $("medSetup").style.display = "block";
@@ -1535,14 +1626,48 @@ const BADGES = [
   { e: "📅", n: "30 días entrenados", ok: () => mind.hist.filter(h => h.idx != null).length >= 30 },
   { e: "🏆", n: "Reto completado",   ok: () => (mind.completedCh || 0) >= 1 }
 ];
+function medMinutesToday() {
+  const s = store.get("med", { days: {} });
+  return (s.days || {})[todayKey()] || 0;
+}
+function stepsTodaySafe() {
+  try { return ped.steps; } catch { return (store.get("steps", { today: 0 }).today) || 0; }
+}
+function challengeMet(r) {
+  const g = r ? r.g : {};
+  if (!activeGames().every(k => g[k] !== undefined)) return false;
+  const ch = mind.challenge;
+  if (ch) {
+    if ((ch.medMin || 0) > 0 && medMinutesToday() < ch.medMin) return false;
+    if ((ch.steps || 0) > 0 && stepsTodaySafe() < ch.steps) return false;
+  }
+  return true;
+}
+/* Marca el día del reto cuando TODOS los requisitos (juegos, meditación,
+   pasos) se cumplen — puede dispararse desde cualquiera de los tres */
+function chDayCheck(fromGames) {
+  const ch = mind.challenge;
+  if (!ch) return;
+  const len = ch.len || 30, today = todayKey();
+  if (ch.days.length >= len || ch.days.includes(today)) return;
+  if (!challengeMet(todayRec(false))) return;
+  ch.days.push(today);
+  if (ch.days.length >= len) {
+    mind.completedCh = (mind.completedCh || 0) + 1;
+    toast(`🏆 ¡Reto de ${len} días completado!`, 5000);
+    chime(660, .6); setTimeout(() => chime(880, .8), 250);
+  } else if (!fromGames) {
+    toast(`Día ${ch.days.length} del reto completado ✓`, 3800);
+    chime(700, .5);
+  }
+  saveMind(); renderMind();
+}
 function checkDailyCompletion(r) {
   if (!activeGames().every(k => r.g[k] !== undefined)) return;
   const today = todayKey();
   const ch = mind.challenge;
-  const len = ch ? (ch.len || 30) : 30;
-  const isNewChDay = ch && ch.days.length < len && !ch.days.includes(today);
-  if (isNewChDay) ch.days.push(today);
-  if (mind.lastLevelDay !== today) {
+  const firstToday = mind.lastLevelDay !== today;
+  if (firstToday) {
     mind.lastLevelDay = today;
     const pace = ch && ch.pace ? ch.pace : 1;
     const prev = mind.hist.filter(h => h.d !== today && h.idx != null).slice(-3);
@@ -1559,17 +1684,11 @@ function checkDailyCompletion(r) {
     chime(700, .6); vibrate([60, 40, 60]);
   }
   saveMind(); renderMind();
-  if (isNewChDay) {
-    if (ch.days.length >= len) {
-      mind.completedCh = (mind.completedCh || 0) + 1;
-      saveMind(); renderMind();
-      toast(`🏆 ¡Reto de ${len} días completado!`, 5000);
-    }
-    setTimeout(() => { buildReport(); showGame("report"); }, 1300);
-  }
+  chDayCheck(true);
+  if (firstToday) setTimeout(() => { buildReport(); showGame("report"); }, 1300);
 }
 /* Constructor de retos personalizados */
-const retoCfg = { len: 30, games: [...MIND_GAMES], lvl: 0, pace: 1 };
+const retoCfg = { len: 30, games: [...MIND_GAMES], lvl: 0, pace: 1, medMin: 0, steps: 0 };
 let retoQuitArm = 0;
 function renderReto() {
   const el = $("retoBody"), ch = mind.challenge;
@@ -1588,6 +1707,10 @@ function renderReto() {
         <button class="chip${S(retoCfg.pace === 1)}" data-rpace="1">Gradual · +1 nivel</button>
         <button class="chip${S(retoCfg.pace === 2)}" data-rpace="2">Intensa · +2 niveles</button>
       </div>
+      <h2 style="margin-top:14px">🧘 Meditación diaria</h2>
+      <div class="chips">${[[0, "No"], [5, "5 min"], [10, "10 min"], [15, "15 min"]].map(([v, n]) => `<button class="chip${S(retoCfg.medMin === v)}" data-rmed="${v}">${n}</button>`).join("")}</div>
+      <h2 style="margin-top:14px">👣 Pasos diarios</h2>
+      <div class="chips">${[[0, "No"], [3000, "3.000"], [6000, "6.000"], [10000, "10.000"]].map(([v, n]) => `<button class="chip${S(retoCfg.steps === v)}" data-rsteps="${v}">${n}</button>`).join("")}</div>
       <div style="height:14px"></div>
       <button class="btn small" id="retoStart">Comenzar mi reto de ${retoCfg.len} días</button>`;
     return;
@@ -1603,8 +1726,16 @@ function renderReto() {
   const r = todayRec(false), g = r ? r.g : {};
   const doneToday = ch.days.includes(today);
   const dayN = Math.min(len, done + (doneToday ? 0 : 1));
-  const chips = games.map(k =>
+  let chips = games.map(k =>
     `<span class="gchip ${g[k] !== undefined ? "ok" : ""}">${GAME_META[k].ico} ${GAME_META[k].n}${g[k] !== undefined ? " ✓" : ""}</span>`).join("");
+  if (ch.medMin) {
+    const m = medMinutesToday(), ok = m >= ch.medMin;
+    chips += `<span class="gchip ${ok ? "ok" : ""}">🧘 ${Math.min(m, ch.medMin)}/${ch.medMin} min${ok ? " ✓" : ""}</span>`;
+  }
+  if (ch.steps) {
+    const s = stepsTodaySafe(), ok = s >= ch.steps;
+    chips += `<span class="gchip ${ok ? "ok" : ""}">👣 ${Math.min(s, ch.steps).toLocaleString("es")}/${ch.steps.toLocaleString("es")}${ok ? " ✓" : ""}</span>`;
+  }
   const streak = trainStreak();
   el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline">
       <b style="font-size:17px">Día ${dayN} de ${len}</b><span style="opacity:.6;font-size:13px">${done} completados</span></div>
@@ -1617,9 +1748,11 @@ function renderReto() {
     </div>`;
 }
 $("retoBody").addEventListener("click", (e) => {
-  const c = e.target.closest("[data-rlen],[data-rgame],[data-rlvl],[data-rpace],#retoStart,#retoNew,#retoQuit");
+  const c = e.target.closest("[data-rlen],[data-rgame],[data-rlvl],[data-rpace],[data-rmed],[data-rsteps],#retoStart,#retoNew,#retoQuit");
   if (!c) return;
   if (c.dataset.rlen) { retoCfg.len = +c.dataset.rlen; renderReto(); }
+  else if (c.dataset.rmed !== undefined) { retoCfg.medMin = +c.dataset.rmed; renderReto(); }
+  else if (c.dataset.rsteps !== undefined) { retoCfg.steps = +c.dataset.rsteps; renderReto(); }
   else if (c.dataset.rgame) {
     const g = c.dataset.rgame;
     if (retoCfg.games.includes(g)) {
@@ -1631,10 +1764,11 @@ $("retoBody").addEventListener("click", (e) => {
   else if (c.dataset.rlvl !== undefined) { retoCfg.lvl = +c.dataset.rlvl; renderReto(); }
   else if (c.dataset.rpace) { retoCfg.pace = +c.dataset.rpace; renderReto(); }
   else if (c.id === "retoStart") {
-    mind.challenge = { start: todayKey(), days: [], len: retoCfg.len, games: [...retoCfg.games], pace: retoCfg.pace };
+    mind.challenge = { start: todayKey(), days: [], len: retoCfg.len, games: [...retoCfg.games], pace: retoCfg.pace, medMin: retoCfg.medMin, steps: retoCfg.steps };
     mind.level = retoCfg.lvl; // la dificultad elegida es el punto de partida
     saveMind(); renderMind();
-    toast(`Reto de ${retoCfg.len} días iniciado 💪 Nivel inicial: ${retoCfg.lvl + 1}. Completa tus ${retoCfg.games.length} ejercicios hoy.`, 4200);
+    const extras = (retoCfg.medMin ? ` + ${retoCfg.medMin} min de meditación` : "") + (retoCfg.steps ? ` + ${retoCfg.steps.toLocaleString("es")} pasos` : "");
+    toast(`Reto de ${retoCfg.len} días iniciado 💪 ${retoCfg.games.length} ejercicios${extras} cada día.`, 4600);
   }
   else if (c.id === "retoNew") { mind.challenge = null; saveMind(); renderMind(); }
   else if (c.id === "retoQuit") {
@@ -1848,6 +1982,380 @@ function renderMind() {
 renderMind();
 
 /* =========================================================================
+   APRENDER — repaso espaciado (SM-2), curva del olvido y palacio de memoria
+   ========================================================================= */
+const SEED_CARDS = [
+  // 🚑 Primeros auxilios
+  ["🚑 Primeros auxilios","¿Ritmo y profundidad de las compresiones en RCP?","100–120 por minuto y ~5 cm de profundidad (el ritmo de 'Stayin’ Alive'). No pares hasta que llegue ayuda."],
+  ["🚑 Primeros auxilios","¿Qué hacer si alguien se atraganta y no puede hablar ni toser?","Maniobra de Heimlich: compresiones bruscas hacia adentro y arriba en el abdomen, entre ombligo y esternón, hasta expulsar el objeto."],
+  ["🚑 Primeros auxilios","¿Cómo tratar una quemadura leve?","Agua corriente fresca 10–20 minutos. Nunca hielo, pasta de dientes ni mantequilla. Cubrir con gasa limpia sin reventar ampollas."],
+  ["🚑 Primeros auxilios","¿En qué posición pones a una persona inconsciente que respira?","Posición lateral de seguridad: de lado, cabeza inclinada atrás, boca orientada al suelo para que no se ahogue."],
+  ["🚑 Primeros auxilios","¿Cómo detener un sangrado abundante?","Presión directa y firme con tela limpia sin levantarla para mirar. Si empapa, añade más tela encima. Eleva la zona si puedes."],
+  ["🚑 Primeros auxilios","Señales de infarto","Presión o dolor en el pecho que puede irradiar a brazo izquierdo, mandíbula o espalda; sudor frío, náusea, falta de aire. Llama a emergencias de inmediato."],
+  ["🚑 Primeros auxilios","¿Cómo reconocer un ACV (derrame) rápido?","Prueba 3 cosas: sonreír (cara torcida), levantar ambos brazos (uno cae), hablar (lengua trabada). Una sola falla = emergencia; cada minuto cuenta."],
+  ["🚑 Primeros auxilios","¿Qué NO hacer durante una convulsión?","No meter nada en la boca ni sujetar a la persona. Despeja el área, protege su cabeza y cronometra: más de 5 minutos = emergencia."],
+  // 💰 Finanzas
+  ["💰 Finanzas","Regla del 72","Divide 72 entre el interés anual: te da los años para duplicar tu dinero. Al 8% anual, tu dinero se duplica en ~9 años."],
+  ["💰 Finanzas","¿De cuánto debe ser tu fondo de emergencia?","3 a 6 meses de tus gastos, en una cuenta disponible al instante. Se construye ANTES de invertir."],
+  ["💰 Finanzas","¿Qué deuda pagar primero?","La de mayor interés (normalmente la tarjeta de crédito). Eliminarla es un 'retorno garantizado' del 30-60% anual."],
+  ["💰 Finanzas","Regla 50/30/20","50% del ingreso a necesidades, 30% a gustos, 20% a ahorro e inversión."],
+  ["💰 Finanzas","¿Por qué el interés compuesto premia empezar temprano?","Los intereses generan intereses: empezar 10 años antes suele valer más que aportar el doble después."],
+  ["💰 Finanzas","¿Qué es diversificar?","No poner todo en un solo activo: repartir entre varios reduce el riesgo sin sacrificar tanto retorno."],
+  ["💰 Finanzas","¿Qué le hace la inflación a tu dinero quieto?","Le quita poder de compra cada año: con 5% anual, en ~14 años vale la mitad. Por eso el ahorro a largo plazo se invierte."],
+  ["💰 Finanzas","'Págate primero'","Aparta el ahorro (10–20%) apenas cobras, no con 'lo que sobre' — nunca sobra."],
+  // 🧠 Aprendizaje
+  ["🧠 Aprendizaje","¿Cuánto olvidamos sin repasar?","~50% en 1 día y ~80% en un mes (curva de Ebbinghaus). Los repasos espaciados aplanan la curva."],
+  ["🧠 Aprendizaje","¿Cuándo conviene repasar algo nuevo?","Aproximadamente a los 1, 3, 7 y 21 días. Cada repaso multiplica el tiempo que dura el recuerdo."],
+  ["🧠 Aprendizaje","Práctica de recuperación","Intentar recordar sin mirar fija más que releer: el esfuerzo de recordar ES el aprendizaje."],
+  ["🧠 Aprendizaje","Técnica Feynman","Explica el tema con palabras simples, como a un niño. Donde te trabes, ahí está tu laguna."],
+  ["🧠 Aprendizaje","Intercalar materias (interleaving)","Mezclar temas distintos en una sesión rinde más que estudiar bloques de lo mismo, aunque se sienta más difícil."],
+  ["🧠 Aprendizaje","¿Cuándo consolida el cerebro lo aprendido?","Durante el sueño profundo. Dormir bien después de estudiar es parte del estudio."],
+  ["🧠 Aprendizaje","Técnica Pomodoro","25 min de foco total + 5 de descanso; tras 4 ciclos, descanso largo. El cerebro sostiene mejor el esfuerzo en bloques."],
+  ["🧠 Aprendizaje","¿Por qué funciona el palacio de memoria?","El cerebro recuerda lugares y rutas muchísimo mejor que listas: al anclar datos a sitios conocidos, heredan esa memoria espacial."],
+  // 🥗 Salud
+  ["🥗 Salud","¿Cuánta agua necesitas al día?","Unos 30–35 ml por kg de peso: una persona de 70 kg ≈ 2–2,5 litros, más con ejercicio o calor."],
+  ["🥗 Salud","¿Cuántas horas de sueño necesita un adulto?","7 a 9 horas. Dormir menos de 6 de forma crónica deteriora memoria, ánimo e inmunidad."],
+  ["🥗 Salud","Ejercicio mínimo recomendado (OMS)","150 minutos semanales de ejercicio moderado + 2 días de fuerza muscular."],
+  ["🥗 Salud","¿Hasta qué hora tomar café?","Su vida media es 5–6 h: un café a las 4 pm sigue medio activo a las 10 pm. Corta 8–10 h antes de dormir."],
+  ["🥗 Salud","Azúcar libre máxima recomendada (OMS)","Idealmente menos de 25 g al día — una sola lata de refresco ya lo supera."],
+  ["🥗 Salud","¿Para qué sirve la luz de la mañana?","10 min de luz natural al despertar ajustan tu reloj biológico: más energía de día y mejor sueño de noche."],
+  ["🥗 Salud","¿Cuánta proteína si entrenas?","1,2–2 g por kg de peso al día, repartida entre las comidas."],
+  ["🥗 Salud","¿Qué logra caminar 30 min diarios?","Reduce de forma notable el riesgo cardiovascular, la ansiedad y la mortalidad general. Es el 'medicamento' más barato."],
+  ["🥗 Salud","¿Cuánta fibra al día?","25–38 g (legumbres, avena, frutas, verduras): sacia, cuida el corazón y alimenta tu microbiota."],
+  ["🥗 Salud","Respiración para calmarte en 1 minuto","Exhala más largo de lo que inhalas (ej. inhala 4 s, exhala 8 s): activa el sistema nervioso de descanso."],
+  // 🔢 Cálculo mental
+  ["🔢 Cálculo mental","Multiplicar por 5 al vuelo","Multiplica por 10 y divide entre 2: 48×5 → 480/2 = 240."],
+  ["🔢 Cálculo mental","Multiplicar por 25 al vuelo","Multiplica por 100 y divide entre 4: 32×25 → 3200/4 = 800."],
+  ["🔢 Cálculo mental","Calcular 15% (propina)","10% + su mitad: 15% de 80 → 8 + 4 = 12."],
+  ["🔢 Cálculo mental","Truco de porcentajes invertidos","a% de b = b% de a. ¿8% de 50? = 50% de 8 = 4."],
+  ["🔢 Cálculo mental","Cuadrado de un número terminado en 5","n5² = n×(n+1) y pega '25': 65² → 6×7=42 → 4225."],
+  ["🔢 Cálculo mental","Sumar rápido números feos","Redondea y compensa: 297+458 = 300+458−3 = 755."],
+  // 🗣️ Comunicación
+  ["🗣️ Comunicación","¿Cuál es el sonido favorito de cualquier persona?","Su propio nombre. Úsalo (con naturalidad) al saludar, agradecer y despedirte."],
+  ["🗣️ Comunicación","Escucha activa","Parafrasea lo que oíste: 'entonces lo que te preocupa es…'. La gente confía en quien demuestra que entendió."],
+  ["🗣️ Comunicación","El poder del silencio","Tras una oferta o pregunta difícil, calla. El silencio incomoda, y quien se incomoda primero suele ceder."],
+  ["🗣️ Comunicación","Cómo decir que no","'No puedo comprometerme con eso' es una oración completa. Una justificación larga invita a negociar tu no."],
+  ["🗣️ Comunicación","Efecto Benjamin Franklin","Pídele un favor pequeño a alguien: para justificar su esfuerzo, su cerebro decide que le caes bien."],
+  ["🗣️ Comunicación","Críticas que no destruyen","Describe el comportamiento, no a la persona: 'este informe llegó tarde' en vez de 'eres impuntual'."],
+  // 🌍 Ciencia
+  ["🌍 Ciencia","¿A qué velocidad viaja la luz?","~300.000 km/s. La luz del Sol tarda 8 min 20 s en llegar a tus ojos: siempre lo ves como era hace 8 minutos."],
+  ["🌍 Ciencia","¿Los antibióticos curan la gripe?","No: solo actúan contra bacterias, nunca contra virus. Usarlos sin necesidad crea superbacterias resistentes."],
+  ["🌍 Ciencia","¿Cuántas neuronas tiene tu cerebro?","~86.000 millones, con billones de conexiones que se remodelan toda la vida: eso es la neuroplasticidad."],
+  ["🌍 Ciencia","¿Qué porcentaje de tu cuerpo es agua?","~60% (el cerebro, ~75%). Por eso una deshidratación leve ya baja la concentración."],
+  ["🌍 Ciencia","¿Cuánto ADN compartimos entre humanos?","El 99,9% entre cualquier par de personas — y ~98% con los chimpancés."],
+  ["🌍 Ciencia","¿Cómo funciona una vacuna?","Entrena al sistema inmune con una 'muestra' inofensiva del patógeno para que, al ver el real, lo reconozca y ataque rápido."],
+  ["🌍 Ciencia","¿El efecto placebo es real?","Sí: la expectativa de mejorar produce mejoras medibles (dolor, ánimo). Por eso los ensayos clínicos se hacen 'a ciegas'."],
+  ["🌍 Ciencia","¿El agua siempre hierve a 100 °C?","No: a mayor altitud hierve a menos temperatura (en La Paz, ~87 °C), por eso cocinar allí tarda más."],
+  ["🌍 Ciencia","¿Qué es un año luz?","Una distancia, no un tiempo: lo que la luz recorre en un año, ~9,46 billones de km."],
+  ["🌍 Ciencia","¿Por qué recuerdas mejor lo emocional?","La amígdala 'etiqueta' como importante lo que te hace sentir: la emoción es el subrayador del cerebro."],
+  // 🏠 Vida práctica
+  ["🏠 Vida práctica","¿Fuego de aceite en la cocina?","JAMÁS agua (explota en bola de fuego). Corta el calor y tapa la sartén con tapa o paño húmedo para ahogar la llama."],
+  ["🏠 Vida práctica","Donante y receptor universal de sangre","O negativo dona a todos; AB positivo recibe de todos. Conocer tu grupo puede salvar minutos críticos."],
+  ["🏠 Vida práctica","¿Cómo cuidar la batería del teléfono?","Mantenla entre 20% y 80% y evita el calor: así envejece mucho más lento."],
+  ["🏠 Vida práctica","¿Cómo es una contraseña realmente segura?","Una frase larga y única (4+ palabras al azar) vence a una corta 'compleja'. Usa gestor de contraseñas y verificación en 2 pasos."],
+  ["🏠 Vida práctica","Regla 3-2-1 de copias de seguridad","3 copias de lo importante, en 2 medios distintos, 1 fuera de casa (nube). Ningún disco dura para siempre."],
+  ["🏠 Vida práctica","Monóxido de carbono","Gas sin olor ni color de combustiones mal ventiladas. Dolor de cabeza + somnolencia en interior → ventilar y salir ya."],
+  ["🏠 Vida práctica","¿Cómo se ve un ahogamiento real?","Silencioso: sin gritos ni brazos agitados. La persona está vertical, cabeza atrás, 'tranquila'. Dura 20–60 segundos."],
+  ["🏠 Vida práctica","Números de emergencia","112 funciona en Europa y gran parte del mundo; 911 en América. En muchos países ambos redirigen."],
+  // 🧭 Supervivencia
+  ["🧭 Supervivencia","Regla de 3 de supervivencia","~3 minutos sin aire, 3 horas sin abrigo (frío extremo), 3 días sin agua, 3 semanas sin comida. Prioriza en ese orden."],
+  ["🧭 Supervivencia","¿Cómo potabilizar agua sin filtro?","Hervirla 1 minuto (3 min en altitud) mata prácticamente todos los patógenos."],
+  ["🧭 Supervivencia","Lo primero ante hipotermia","Quitar la ropa mojada: el agua roba calor corporal ~25 veces más rápido que el aire."],
+  ["🧭 Supervivencia","Orientarse con el sol","Sale ~por el este y se pone ~por el oeste. A mediodía tu sombra apunta al norte (en el hemisferio norte)."],
+  // 🍳 Cocina
+  ["🍳 Cocina","¿Cómo saber si un huevo está fresco?","Ponlo en agua: se hunde acostado = fresco; se para = úsalo pronto; flota = descártalo."],
+  ["🍳 Cocina","¿Por qué reposar la carne tras cocinarla?","5–10 min de reposo redistribuyen los jugos: si cortas al instante, se escapan y queda seca."],
+  ["🍳 Cocina","Arroz blanco que no falla","2 partes de agua por 1 de arroz; hervir, tapar a fuego mínimo 15–18 min y NO destapar."],
+  ["🍳 Cocina","¿Por qué los postres llevan una pizca de sal?","La sal intensifica el sabor dulce y equilibra el amargo: realza sin salar."]
+];
+let srs = store.get("srs", null);
+if (!srs || !srs.cards) {
+  srs = { seedV: 1, log: {}, cards: SEED_CARDS.map((c, i) => ({ id: "s" + i, cat: c[0], q: c[1], a: c[2], reps: 0, int: 0, ease: 2.5, due: todayKey() })) };
+  store.set("srs", srs);
+}
+function srsSave() { store.set("srs", srs); }
+function dueCards() { const t = todayKey(); return srs.cards.filter(c => c.due <= t); }
+function srsNextInt(c, g) { // previsualizar el intervalo de cada botón
+  const int = Math.max(1, c.int || 1), ease = c.ease || 2.5;
+  if (g === 0) return "ahora";
+  if (g === 1) return Math.max(1, Math.round(int * 1.2)) + " d";
+  if (g === 2) return (c.reps === 0 ? 1 : Math.round(int * ease)) + " d";
+  return (c.reps === 0 ? 3 : Math.round(int * ease * 1.3)) + " d";
+}
+function srsApply(c, g) {
+  c.last = Date.now();
+  if (g === 0) {
+    c.reps = 0; c.int = 0; c.due = todayKey();
+    c.ease = Math.max(1.3, (c.ease || 2.5) - 0.2);
+  } else {
+    if (g === 1) { c.int = Math.max(1, Math.round((c.int || 1) * 1.2)); c.ease = Math.max(1.3, (c.ease || 2.5) - 0.15); }
+    else if (g === 2) { c.int = c.reps === 0 ? 1 : Math.round(Math.max(1, c.int || 1) * (c.ease || 2.5)); }
+    else { c.int = c.reps === 0 ? 3 : Math.round(Math.max(1, c.int || 1) * (c.ease || 2.5) * 1.3); c.ease = (c.ease || 2.5) + 0.15; }
+    c.int = Math.min(c.int, 365);
+    c.reps = (c.reps || 0) + 1;
+    const d = new Date(); d.setDate(d.getDate() + c.int);
+    c.due = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  srs.log[todayKey()] = (srs.log[todayKey()] || 0) + 1;
+  srsSave();
+}
+function cardRetention(c, plusDays = 0) {
+  if (!c.last) return null;
+  const elapsed = (Date.now() - c.last) / 864e5 + plusDays;
+  const S = Math.max(0.8, c.int || 1) * 1.6; // estabilidad crece con el intervalo
+  return Math.exp(-Math.max(0, elapsed) / S);
+}
+/* --- Sesión de repaso --- */
+const rv = { q: [], cur: null, on: false };
+function rvShowNext() {
+  if (!rv.q.length) {
+    rv.on = false;
+    $("revBox").style.display = "none";
+    $("revHome").style.display = "block";
+    renderLearn();
+    toast("Repaso terminado ✓ Tu curva del olvido acaba de aplanarse.");
+    chime(700, .7);
+    return;
+  }
+  rv.cur = rv.q[0];
+  $("revCat").textContent = rv.cur.cat;
+  $("revLeft").textContent = rv.q.length + " restantes";
+  $("revQ").textContent = rv.cur.q;
+  $("revA").style.display = "none";
+  $("revA").textContent = rv.cur.a;
+  $("revShow").style.display = "block";
+  $("revGrades").style.display = "none";
+}
+$("startRev").addEventListener("click", () => {
+  ensureAudio();
+  const due = dueCards();
+  if (!due.length) { toast("Todo al día ✓ Vuelve mañana o añade tarjetas nuevas."); return; }
+  rv.q = due.sort(() => Math.random() - .5).slice(0, 60);
+  rv.on = true;
+  $("revHome").style.display = "none";
+  $("revBox").style.display = "block";
+  rvShowNext();
+});
+$("revShow").addEventListener("click", () => {
+  $("revA").style.display = "block";
+  $("revShow").style.display = "none";
+  $("revGrades").style.display = "grid";
+  [0, 1, 2, 3].forEach(g => $("ivl" + g).textContent = srsNextInt(rv.cur, g));
+});
+$("revGrades").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-g]"); if (!b) return;
+  const g = +b.dataset.g;
+  srsApply(rv.cur, g);
+  rv.q.shift();
+  if (g === 0) rv.q.push(rv.cur); // "Otra vez" vuelve al final de la sesión
+  vibrate(20);
+  rvShowNext();
+});
+$("revQuit").addEventListener("click", () => {
+  rv.on = false; rv.q = [];
+  $("revBox").style.display = "none";
+  $("revHome").style.display = "block";
+  renderLearn();
+});
+/* --- Añadir y gestionar tarjetas --- */
+$("addBtn").addEventListener("click", () => {
+  const q = $("addQ").value.trim(), a = $("addA").value.trim();
+  if (!q || !a) { toast("Escribe la pregunta y la respuesta."); return; }
+  srs.cards.unshift({ id: "u" + Date.now().toString(36), cat: "📝 Mías", q, a, reps: 0, int: 0, ease: 2.5, due: todayKey() });
+  srsSave();
+  $("addQ").value = ""; $("addA").value = "";
+  renderLearn();
+  toast("Tarjeta guardada ✓ Aparecerá en tu repaso de hoy.");
+});
+let listOpen = false;
+$("manageBtn").addEventListener("click", () => { listOpen = !listOpen; renderLearn(); });
+$("cardList").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-del]"); if (!b) return;
+  srs.cards = srs.cards.filter(c => c.id !== b.dataset.del);
+  srsSave(); renderLearn();
+  toast("Tarjeta eliminada.");
+});
+/* --- Curva del olvido --- */
+function drawForget() {
+  const cv = $("forgetCv");
+  if (!cv) return;
+  const W = cv.clientWidth, H = 150;
+  if (!W || W < 40) return;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const c = cv.getContext("2d");
+  c.scale(dpr, dpr); c.clearRect(0, 0, W, H);
+  const light = document.body.classList.contains("light");
+  const lbl = light ? "rgba(35,45,90,.55)" : "rgba(255,255,255,.45)";
+  const grid = light ? "rgba(35,45,90,.12)" : "rgba(255,255,255,.10)";
+  c.font = "12px -apple-system, sans-serif";
+  const reviewed = srs.cards.filter(x => x.last);
+  if (!reviewed.length) {
+    c.fillStyle = lbl; c.textAlign = "center";
+    c.fillText("Haz tu primer repaso para ver tu curva", W / 2, H / 2);
+    return;
+  }
+  const acc = getComputedStyle(document.documentElement).getPropertyValue("--accA").trim() || "#5b6cff";
+  const P = { l: 36, r: 10, t: 12, b: 20 };
+  const X = (d) => P.l + (W - P.l - P.r) * d / 30;
+  const Y = (r) => P.t + (H - P.t - P.b) * (1 - r);
+  c.strokeStyle = grid; c.fillStyle = lbl; c.lineWidth = 1; c.textAlign = "left";
+  [1, .5, 0].forEach(r => {
+    const y = Y(r);
+    c.beginPath(); c.moveTo(P.l, y); c.lineTo(W - P.r, y); c.stroke();
+    c.fillText(Math.round(r * 100) + "%", 2, y + 4);
+  });
+  // umbral de repaso (80%)
+  c.strokeStyle = light ? "rgba(251,146,60,.5)" : "rgba(251,146,60,.45)";
+  c.setLineDash([4, 4]);
+  c.beginPath(); c.moveTo(P.l, Y(.8)); c.lineTo(W - P.r, Y(.8)); c.stroke();
+  c.setLineDash([]);
+  const avgR = (d) => reviewed.reduce((s, x) => s + (cardRetention(x, d) || 0), 0) / reviewed.length;
+  const area = c.createLinearGradient(0, P.t, 0, H - P.b);
+  area.addColorStop(0, acc + "55"); area.addColorStop(1, acc + "00");
+  c.beginPath();
+  for (let d = 0; d <= 30; d++) { const x = X(d), y = Y(avgR(d)); d ? c.lineTo(x, y) : c.moveTo(x, y); }
+  c.lineTo(X(30), H - P.b); c.lineTo(X(0), H - P.b); c.closePath();
+  c.fillStyle = area; c.fill();
+  c.beginPath();
+  for (let d = 0; d <= 30; d++) { const x = X(d), y = Y(avgR(d)); d ? c.lineTo(x, y) : c.moveTo(x, y); }
+  c.strokeStyle = acc; c.lineWidth = 2.5; c.lineJoin = "round"; c.stroke();
+  c.beginPath(); c.arc(X(0), Y(avgR(0)), 4.5, 0, 7);
+  c.fillStyle = light ? "#212842" : "#fff"; c.fill();
+  c.fillStyle = lbl; c.textAlign = "left"; c.fillText("hoy", P.l, H - 5);
+  c.textAlign = "right"; c.fillText("en 30 días", W - P.r, H - 5);
+}
+function renderLearn() {
+  const due = dueCards().length;
+  $("lrnDue").textContent = due;
+  $("lrnDueSub").textContent = due === 0 ? "todo al día ✓" : (due === 1 ? "tarjeta por repasar" : "tarjetas por repasar");
+  $("lrnTotal").textContent = srs.cards.length;
+  $("lrnMaster").textContent = srs.cards.filter(c => (c.int || 0) >= 21).length;
+  const reviewed = srs.cards.filter(c => c.last);
+  $("lrnRet").textContent = reviewed.length ? Math.round(reviewed.reduce((s, c) => s + (cardRetention(c) || 0), 0) / reviewed.length * 100) + "%" : "—";
+  $("manageBtn").textContent = listOpen ? "Ocultar" : "Gestionar";
+  const list = $("cardList");
+  list.style.display = listOpen ? "block" : "none";
+  if (listOpen) {
+    list.innerHTML = srs.cards.map(c =>
+      `<div class="cardRow"><span title="${c.q.replace(/"/g, "&quot;")}">${c.cat.split(" ")[0]} ${c.q}</span><small>${c.due <= todayKey() ? "hoy" : c.due.slice(8, 10) + "/" + c.due.slice(5, 7)}</small><button data-del="${c.id}" aria-label="Eliminar">✕</button></div>`
+    ).join("");
+  }
+  renderPal();
+  requestAnimationFrame(drawForget);
+}
+window.addEventListener("resize", () => requestAnimationFrame(() => drawForget()));
+
+/* --- Palacio de memoria --- */
+let pals = store.get("palaces", null);
+if (!pals) {
+  pals = [{
+    name: "Ejemplo: los planetas en tu casa",
+    st: [
+      { l: "La puerta de entrada", i: "Mercurio — un termómetro gigante colgado de la puerta" },
+      { l: "El sofá de la sala", i: "Venus — una diosa tomando el sol en el sofá" },
+      { l: "La cocina", i: "La Tierra — una maceta con tierra sobre la mesa" },
+      { l: "El pasillo", i: "Marte — todo pintado de rojo óxido" },
+      { l: "Tu cama", i: "Júpiter — un gigante enorme durmiendo en ella" },
+      { l: "El baño", i: "Saturno — sus anillos son los aros del toallero" },
+      { l: "La ventana", i: "Urano — hielo azul cubriendo el cristal" },
+      { l: "El balcón", i: "Neptuno — el mar azul profundo al fondo" }
+    ]
+  }];
+  store.set("palaces", pals);
+}
+function palSave() { store.set("palaces", pals); }
+const pal = { mode: "menu", idx: 0, i: 0, hits: 0, shown: false, draft: null, delArm: 0 };
+function renderPal() {
+  const el = $("palBox");
+  if (!el) return;
+  if (pal.mode === "menu") {
+    el.innerHTML = `
+      <p class="note" style="margin-top:0">La técnica de los memoriones: recorre mentalmente un lugar que conozcas y "coloca" en cada punto una imagen exagerada de lo que quieres recordar. Para recordarlo, vuelve a caminar la ruta.</p>
+      <div class="gchips" style="margin-top:12px">
+        ${pals.map((p, i) => `<button class="gchip" style="cursor:pointer;border:none;font-family:inherit" data-pgo="${i}">🏛 ${p.name} (${p.st.length})</button>`).join("")}
+        <button class="gchip" style="cursor:pointer;border:none;font-family:inherit" data-pnew="1">➕ Crear palacio</button>
+      </div>`;
+    return;
+  }
+  if (pal.mode === "create") {
+    const d = pal.draft;
+    el.innerHTML = `
+      <input class="tin" id="palName" placeholder="Nombre del palacio (ej. Camino al trabajo)" value="${d.name.replace(/"/g, "&quot;")}" maxlength="60">
+      ${d.st.length ? `<div style="margin-bottom:8px">${d.st.map((s, i) => `<div class="palSt"><b>${i + 1}. ${s.l}</b><span style="opacity:.7">→ ${s.i}</span></div>`).join("")}</div>` : ""}
+      <input class="tin" id="palLocus" placeholder="Lugar de la ruta (ej. La puerta)" maxlength="80">
+      <input class="tin" id="palItem" placeholder="Qué colocas ahí (imagen exagerada)" maxlength="160">
+      <div class="row">
+        <button class="btn ghost small" id="palAddSt">Añadir estación</button>
+        <button class="btn small" id="palSaveBtn">Guardar</button>
+      </div>
+      <div style="height:8px"></div>
+      <button class="btn ghost small" id="palCancel">Cancelar</button>`;
+    return;
+  }
+  // practice
+  const p = pals[pal.idx];
+  if (pal.i >= p.st.length) {
+    el.innerHTML = `
+      <p style="font-size:15px;text-align:center;padding:8px 0">🏛 <b>${p.name}</b><br><br>Recordaste <b>${pal.hits} de ${p.st.length}</b> estaciones.<br><span style="opacity:.6;font-size:13px">${pal.hits === p.st.length ? "¡Palacio dominado! Recórrelo de nuevo mañana para fijarlo." : "Refuerza las imágenes que fallaste: hazlas más absurdas y grandes."}</span></p>
+      <button class="btn small" id="palBack">Volver</button>`;
+    return;
+  }
+  const s = p.st[pal.i];
+  el.innerHTML = `
+    <div class="gameHud"><span>🏛 ${p.name}</span><span>${pal.i + 1} / ${p.st.length}</span></div>
+    <div id="revQ">📍 ${s.l}</div>
+    <div style="opacity:.6;font-size:14px">¿Qué colocaste en este lugar?</div>
+    ${pal.shown ? `<div id="revA" style="display:block">${s.i}</div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost small" id="palMiss">Fallé ✗</button>
+        <button class="btn small" id="palHit">La recordé ✓</button>
+      </div>` : `<div style="height:12px"></div><button class="btn" id="palShow">Mostrar</button>`}
+    <div style="height:8px"></div>
+    <div style="display:flex;justify-content:space-between">
+      <button class="btn ghost small" id="palBack" style="width:auto;padding:9px 14px">‹ Salir</button>
+      <button id="palDel" style="background:none;border:none;color:#fb7185;font-size:12.5px;cursor:pointer">${Date.now() - pal.delArm < 2500 ? "¿Borrar palacio?" : "Borrar"}</button>
+    </div>`;
+}
+$("palBox").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-pgo],[data-pnew],#palAddSt,#palSaveBtn,#palCancel,#palShow,#palHit,#palMiss,#palBack,#palDel");
+  if (!t) return;
+  if (t.dataset.pgo !== undefined) { pal.mode = "practice"; pal.idx = +t.dataset.pgo; pal.i = 0; pal.hits = 0; pal.shown = false; pal.delArm = 0; renderPal(); }
+  else if (t.dataset.pnew) { pal.mode = "create"; pal.draft = { name: "", st: [] }; renderPal(); }
+  else if (t.id === "palAddSt") {
+    pal.draft.name = $("palName").value;
+    const l = $("palLocus").value.trim(), i = $("palItem").value.trim();
+    if (!l || !i) { toast("Escribe el lugar y lo que colocas ahí."); return; }
+    pal.draft.st.push({ l, i });
+    renderPal();
+    $("palLocus").focus();
+  }
+  else if (t.id === "palSaveBtn") {
+    pal.draft.name = $("palName").value.trim();
+    if (!pal.draft.name) { toast("Ponle nombre a tu palacio."); return; }
+    if (pal.draft.st.length < 2) { toast("Añade al menos 2 estaciones."); return; }
+    pals.push({ name: pal.draft.name, st: pal.draft.st });
+    palSave();
+    pal.mode = "menu"; renderPal();
+    toast("Palacio guardado 🏛 Recórrelo hoy, mañana y en 3 días para fijarlo.");
+  }
+  else if (t.id === "palCancel" || t.id === "palBack") { pal.mode = "menu"; renderPal(); }
+  else if (t.id === "palShow") { pal.shown = true; renderPal(); }
+  else if (t.id === "palHit" || t.id === "palMiss") {
+    if (t.id === "palHit") { pal.hits++; vibrate(20); }
+    pal.i++; pal.shown = false; renderPal();
+  }
+  else if (t.id === "palDel") {
+    if (Date.now() - pal.delArm < 2500) {
+      pals.splice(pal.idx, 1); palSave();
+      pal.mode = "menu"; pal.delArm = 0; renderPal();
+      toast("Palacio borrado.");
+    } else { pal.delArm = Date.now(); renderPal(); setTimeout(() => { if (pal.mode === "practice" && Date.now() - pal.delArm >= 2400) renderPal(); }, 2600); }
+  }
+});
+renderLearn();
+
+/* =========================================================================
    PODÓMETRO
    ========================================================================= */
 const SENS = { baja: 1.4, media: 0.8, alta: 0.45 };
@@ -1904,7 +2412,10 @@ function pedRender() {
     vibrate([80, 60, 80, 60, 160]);
   }
   // Caminando, reconstruir las barras semanales solo cada 25 pasos (rendimiento)
-  if (!ped.active || ped.steps % 25 === 0 || ped.steps < 3) renderWeek();
+  if (!ped.active || ped.steps % 25 === 0 || ped.steps < 3) {
+    renderWeek();
+    chDayCheck(false); // los pasos pueden cerrar el día de un reto combinado
+  }
 }
 function renderWeek() {
   const wrap = $("weekBars");
