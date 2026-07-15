@@ -13,7 +13,9 @@
     --accA:#5b6cff; --accB:#8b5cf6;
     --orb1:#3b4fd8; --orb2:#7c3aed; --orb3:#0ea5b7;
   }
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  /* touch-action en cada elemento: elimina el retardo/zoom de doble toque
+     sin bloquear toques rápidos consecutivos (Stroop, Cálculo) */
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
   html, body { height:100%; overflow:hidden; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
@@ -435,10 +437,10 @@
         <div class="glass">
           <div class="gameHud"><span id="simonLevel">Nivel 1</span><span id="simonBestHud">Récord: —</span></div>
           <div id="simonGrid">
-            <div class="simonPad" data-p="0" style="background:#6366f1"></div>
-            <div class="simonPad" data-p="1" style="background:#10b981"></div>
-            <div class="simonPad" data-p="2" style="background:#f59e0b"></div>
-            <div class="simonPad" data-p="3" style="background:#ec4899"></div>
+            <div class="simonPad" data-p="0" role="button" aria-label="Pad azul" style="background:#6366f1"></div>
+            <div class="simonPad" data-p="1" role="button" aria-label="Pad verde" style="background:#10b981"></div>
+            <div class="simonPad" data-p="2" role="button" aria-label="Pad ámbar" style="background:#f59e0b"></div>
+            <div class="simonPad" data-p="3" role="button" aria-label="Pad rosa" style="background:#ec4899"></div>
           </div>
           <div id="simonMsg">Observa la secuencia y repítela</div>
           <button class="btn" id="simonStart">Comenzar</button>
@@ -1386,18 +1388,25 @@ function caNext() {
     if (d >= 0 && d !== res) opts.add(d);
   }
   const arr = [...opts].sort(() => Math.random() - .5);
-  $("calcOpts").innerHTML = "";
-  arr.forEach(v => {
-    const b2 = document.createElement("button");
-    b2.textContent = v;
-    b2.addEventListener("click", () => {
-      if (!ca.on) return;
-      if (v === ca.answer) { ca.score++; tone(880, .08, .1); }
-      else { ca.score = Math.max(0, ca.score - 1); vibrate(60); tone(220, .15, .12); }
-      $("calcScore").textContent = "Aciertos: " + ca.score;
-      caNext();
-    });
-    $("calcOpts").appendChild(b2);
+  // Reutilizar los 4 botones (solo cambian las etiquetas): reconstruirlos en
+  // cada pregunta podía tragarse un toque rápido que cayera durante el reemplazo
+  if ($("calcOpts").children.length !== 4) {
+    $("calcOpts").innerHTML = "";
+    for (let i = 0; i < 4; i++) {
+      const b2 = document.createElement("button");
+      b2.addEventListener("click", () => {
+        if (!ca.on) return;
+        if (+b2.dataset.v === ca.answer) { ca.score++; tone(880, .08, .1); }
+        else { ca.score = Math.max(0, ca.score - 1); vibrate(60); tone(220, .15, .12); }
+        $("calcScore").textContent = "Aciertos: " + ca.score;
+        caNext();
+      });
+      $("calcOpts").appendChild(b2);
+    }
+  }
+  arr.forEach((v, i) => {
+    const b2 = $("calcOpts").children[i];
+    b2.textContent = v; b2.dataset.v = v;
   });
 }
 function caBegin() {
@@ -1723,7 +1732,11 @@ function pedLoad() {
   ped.steps = d.today; ped.total = d.total; ped.hist = d.hist; ped.day = d.day;
   pedRender();
 }
+// Al borrar todo o importar una copia, el guardado automático de pagehide
+// no debe sobrescribir los datos recién borrados/importados
+let skipSave = false;
 function pedSave() {
+  if (skipSave) return;
   store.set("steps", { day: ped.day || todayKey(), today: ped.steps, total: ped.total, hist: ped.hist || {} });
 }
 // Cierre de día a medianoche aunque la app siga abierta
@@ -1750,7 +1763,8 @@ function pedRender() {
     chime(660, .5); setTimeout(() => chime(880, .7), 220);
     vibrate([80, 60, 80, 60, 160]);
   }
-  renderWeek();
+  // Caminando, reconstruir las barras semanales solo cada 25 pasos (rendimiento)
+  if (!ped.active || ped.steps % 25 === 0 || ped.steps < 3) renderWeek();
 }
 function renderWeek() {
   const wrap = $("weekBars");
@@ -1860,6 +1874,7 @@ function pedStop() {
   clearInterval(ped.statusInt);
   releaseWakeLock("ped");
   pedSave();
+  pedRender(); // refrescar barras que el acelerado de caminata pudo dejar atrás
   $("stepBtn").textContent = "Iniciar conteo";
   $("stepBtn").classList.remove("stop");
   $("stepDot").classList.remove("on");
@@ -2111,7 +2126,15 @@ tmRenderSetup();
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     if (tm.running) tmTick();
-    if (med.running && !med.paused && med.endAt - Date.now() <= 0) medFinish(true);
+    if (med.running && !med.paused) {
+      if (med.endAt - Date.now() <= 0) medFinish(true);
+      else if (med.pattern !== "free") {
+        // Resincronizar la guía de respiración: los temporizadores de fase
+        // se congelan en segundo plano y quedan a la deriva
+        clearTimeout(med.phaseTimer); clearInterval(med.countInt);
+        medPhaseLoop();
+      }
+    }
     if (sw.running) swFrame();
   }
 });
@@ -2179,6 +2202,7 @@ $("impFile").addEventListener("change", (e) => {
       const j = JSON.parse(rd.result);
       const data = j && j.app === "zen" && j.data ? j.data : null;
       if (!data || !Object.keys(data).some(k => k.startsWith("zen:"))) { toast("Ese archivo no es una copia de Zen."); return; }
+      skipSave = true;
       Object.entries(data).forEach(([k, v]) => { if (k.startsWith("zen:")) try { localStorage.setItem(k, v); } catch {} });
       toast("Copia restaurada ✓");
       setTimeout(() => location.reload(), 900);
@@ -2220,6 +2244,7 @@ $("wipeBtn").addEventListener("click", () => {
       $("wipeBtn").classList.remove("stop"); $("wipeBtn").classList.add("ghost");
     }, 4000);
   } else {
+    skipSave = true;
     try {
       Object.keys(localStorage).filter(k => k.startsWith("zen:")).forEach(k => localStorage.removeItem(k));
     } catch {}
@@ -2228,13 +2253,18 @@ $("wipeBtn").addEventListener("click", () => {
 });
 
 /* ---------- Robustez global ---------------------------------------------- */
-window.addEventListener("error", (e) => { console.error(e); });
-let lastTouch = 0;
-document.addEventListener("touchend", (e) => {
-  const now = Date.now();
-  if (now - lastTouch < 350) e.preventDefault();
-  lastTouch = now;
-}, { passive: false });
+// Aviso único y visible si algo interno falla (para no fallar en silencio).
+// El zoom por doble toque ya lo bloquea touch-action:manipulation en CSS,
+// sin riesgo de comerse toques rápidos consecutivos como hacía preventDefault.
+let errToasted = false;
+window.addEventListener("error", (e) => {
+  console.error(e);
+  if (!errToasted) {
+    errToasted = true;
+    try { toast("⚠️ Ocurrió un error interno. Si algo dejó de responder, recarga la app."); } catch {}
+  }
+});
+window.addEventListener("unhandledrejection", (e) => { console.error(e.reason); });
 </script>
 </body>
 </html>
