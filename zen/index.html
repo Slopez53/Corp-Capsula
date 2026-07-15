@@ -9,32 +9,30 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Zen · Entrenamiento</title>
 <style>
+  :root {
+    --accA:#5b6cff; --accB:#8b5cf6;
+    --orb1:#3b4fd8; --orb2:#7c3aed; --orb3:#0ea5b7;
+  }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { height:100%; overflow:hidden; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-    background:#0b0f1a;
-    color:#eef2ff;
-    touch-action: manipulation;
-    user-select:none; -webkit-user-select:none;
+    background:#0b0f1a; color:#eef2ff;
+    touch-action:manipulation; user-select:none; -webkit-user-select:none;
     position:fixed; inset:0;
   }
-  /* ---------- Fondo liquid glass ---------- */
   .bg { position:fixed; inset:0; z-index:0; overflow:hidden; }
-  .orb { position:absolute; border-radius:50%; filter:blur(90px); opacity:.55; will-change:transform; }
-  .orb1 { width:60vmax; height:60vmax; left:-20vmax; top:-15vmax; background:radial-gradient(circle,#3b4fd8,transparent 70%); animation:drift1 26s ease-in-out infinite alternate; }
-  .orb2 { width:50vmax; height:50vmax; right:-18vmax; top:30%;  background:radial-gradient(circle,#7c3aed,transparent 70%); animation:drift2 32s ease-in-out infinite alternate; }
-  .orb3 { width:45vmax; height:45vmax; left:10%; bottom:-20vmax; background:radial-gradient(circle,#0ea5b7,transparent 70%); animation:drift3 38s ease-in-out infinite alternate; }
+  .orb { position:absolute; border-radius:50%; filter:blur(90px); opacity:.55; will-change:transform; transition:background 1s; }
+  .orb1 { width:60vmax; height:60vmax; left:-20vmax; top:-15vmax; background:radial-gradient(circle,var(--orb1),transparent 70%); animation:drift1 26s ease-in-out infinite alternate; }
+  .orb2 { width:50vmax; height:50vmax; right:-18vmax; top:30%;  background:radial-gradient(circle,var(--orb2),transparent 70%); animation:drift2 32s ease-in-out infinite alternate; }
+  .orb3 { width:45vmax; height:45vmax; left:10%; bottom:-20vmax; background:radial-gradient(circle,var(--orb3),transparent 70%); animation:drift3 38s ease-in-out infinite alternate; }
   @keyframes drift1 { to { transform:translate(8vmax,6vmax) scale(1.15);} }
   @keyframes drift2 { to { transform:translate(-6vmax,-8vmax) scale(.9);} }
   @keyframes drift3 { to { transform:translate(6vmax,-6vmax) scale(1.1);} }
+  @media (prefers-reduced-motion: reduce) { .orb { animation:none; } }
 
-  /* ---------- Layout ---------- */
   #app { position:relative; z-index:1; height:100%; display:flex; flex-direction:column; }
-  header {
-    padding: calc(env(safe-area-inset-top, 0px) + 14px) 22px 10px;
-    display:flex; justify-content:space-between; align-items:baseline;
-  }
+  header { padding:calc(env(safe-area-inset-top,0px) + 14px) 22px 10px; display:flex; justify-content:space-between; align-items:baseline; }
   header h1 { font-size:20px; font-weight:700; letter-spacing:.5px; }
   header h1 span { opacity:.5; font-weight:300; }
   #miniClock { font-size:15px; font-variant-numeric:tabular-nums; opacity:.65; font-weight:500; }
@@ -44,37 +42,32 @@
   .view.active { display:block; }
   @keyframes fadeIn { from { opacity:0; transform:translateY(8px);} to { opacity:1; transform:none;} }
 
-  /* ---------- Glass ---------- */
   .glass {
-    background: rgba(255,255,255,.07);
-    border: 1px solid rgba(255,255,255,.14);
-    border-radius: 26px;
-    backdrop-filter: blur(22px) saturate(160%);
-    -webkit-backdrop-filter: blur(22px) saturate(160%);
-    box-shadow: 0 8px 32px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.12);
-    padding: 22px;
-    margin-bottom: 14px;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14);
+    border-radius:26px; backdrop-filter:blur(22px) saturate(160%); -webkit-backdrop-filter:blur(22px) saturate(160%);
+    box-shadow:0 8px 32px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.12);
+    padding:22px; margin-bottom:14px;
   }
   .glass h2 { font-size:13px; text-transform:uppercase; letter-spacing:2px; opacity:.55; margin-bottom:14px; font-weight:600; }
 
-  /* ---------- Controles ---------- */
   .chips { display:flex; gap:8px; flex-wrap:wrap; }
   .chip {
     padding:9px 16px; border-radius:999px; font-size:14px; font-weight:600;
     background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
     color:#eef2ff; cursor:pointer; transition:all .2s;
   }
-  .chip.sel { background:rgba(139,160,255,.28); border-color:rgba(139,160,255,.7); box-shadow:0 0 18px rgba(139,160,255,.25); }
+  .chip.sel { background:color-mix(in srgb, var(--accA) 30%, transparent); border-color:var(--accA); box-shadow:0 0 18px color-mix(in srgb, var(--accA) 30%, transparent); }
   .btn {
     display:block; width:100%; padding:16px; border:none; border-radius:20px;
     font-size:16px; font-weight:700; cursor:pointer; color:#fff; letter-spacing:.3px;
-    background:linear-gradient(135deg,#5b6cff,#8b5cf6);
-    box-shadow:0 6px 24px rgba(99,102,241,.4), inset 0 1px 0 rgba(255,255,255,.25);
+    background:linear-gradient(135deg,var(--accA),var(--accB));
+    box-shadow:0 6px 24px color-mix(in srgb, var(--accA) 40%, transparent), inset 0 1px 0 rgba(255,255,255,.25);
     transition:transform .15s, opacity .2s;
   }
   .btn:active { transform:scale(.97); }
   .btn.ghost { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); box-shadow:none; }
   .btn.stop { background:linear-gradient(135deg,#f43f5e,#e11d48); box-shadow:0 6px 24px rgba(244,63,94,.35); }
+  .btn.small { padding:11px; font-size:14px; border-radius:15px; }
   .btn[disabled] { opacity:.4; pointer-events:none; }
   .row { display:flex; gap:10px; }
   .row .btn { flex:1; }
@@ -85,89 +78,154 @@
   .stat { flex:1; text-align:center; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); border-radius:16px; padding:12px 6px; }
   .stat b { display:block; font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
   .stat span { font-size:11px; opacity:.5; text-transform:uppercase; letter-spacing:1px; }
+  .note { font-size:12.5px; line-height:1.5; opacity:.55; margin-top:14px; }
 
-  /* ---------- Meditación ---------- */
+  /* ---- Meditación ---- */
   #breathWrap { display:flex; flex-direction:column; align-items:center; padding:10px 0 6px; }
   #breathCircle {
     width:190px; height:190px; border-radius:50%;
-    background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.35), rgba(139,160,255,.18) 45%, rgba(91,108,255,.10) 70%);
+    background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.35), color-mix(in srgb, var(--accA) 20%, transparent) 45%, color-mix(in srgb, var(--accB) 12%, transparent) 70%);
     border:1.5px solid rgba(255,255,255,.35);
-    box-shadow:0 0 60px rgba(120,140,255,.35), inset 0 0 40px rgba(255,255,255,.12);
+    box-shadow:0 0 60px color-mix(in srgb, var(--accA) 35%, transparent), inset 0 0 40px rgba(255,255,255,.12);
     display:flex; align-items:center; justify-content:center; flex-direction:column;
-    transform:scale(.72);
-    transition:transform 4s cubic-bezier(.4,0,.4,1);
+    transform:scale(.72); transition:transform 4s cubic-bezier(.4,0,.4,1);
   }
   #breathPhase { font-size:21px; font-weight:600; letter-spacing:1px; }
   #breathCount { font-size:15px; opacity:.6; margin-top:4px; font-variant-numeric:tabular-nums; }
   #medRemaining { margin-top:18px; font-size:30px; font-weight:200; font-variant-numeric:tabular-nums; opacity:.85; }
 
-  /* ---------- Reacción ---------- */
+  /* ---- Mente ---- */
+  .gameCard {
+    display:flex; align-items:center; gap:14px; width:100%; text-align:left;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); color:#eef2ff;
+    border-radius:22px; padding:16px 18px; margin-bottom:10px; cursor:pointer;
+    backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+  }
+  .gameCard:active { transform:scale(.98); }
+  .gameCard .ico { font-size:26px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:14px; background:color-mix(in srgb, var(--accA) 18%, transparent); }
+  .gameCard b { display:block; font-size:16px; }
+  .gameCard small { opacity:.55; font-size:12.5px; }
+  .gameCard .best { margin-left:auto; text-align:right; font-size:13px; opacity:.7; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .game { display:none; }
+  .game.active { display:block; }
+  .backBtn { background:none; border:none; color:#eef2ff; opacity:.65; font-size:14px; font-weight:600; cursor:pointer; padding:4px 0 14px; display:flex; align-items:center; gap:6px; }
+  #tip { font-size:12.5px; line-height:1.55; opacity:.6; padding:2px 6px 12px; }
+  #tip b { opacity:.9; }
+
   #reactPad {
-    height:300px; border-radius:26px; display:flex; flex-direction:column; gap:8px;
+    height:280px; border-radius:26px; display:flex; flex-direction:column; gap:8px;
     align-items:center; justify-content:center; cursor:pointer; text-align:center; padding:20px;
     background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14);
-    backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
-    transition:background .12s;
+    backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px); transition:background .12s;
   }
   #reactPad.wait { background:rgba(244,63,94,.28); border-color:rgba(244,63,94,.5); }
   #reactPad.go   { background:rgba(16,185,129,.4);  border-color:rgba(16,185,129,.7); }
   #reactMain { font-size:26px; font-weight:700; }
   #reactSub  { font-size:14px; opacity:.6; }
 
-  /* ---------- Pasos ---------- */
-  .note { font-size:12.5px; line-height:1.5; opacity:.55; margin-top:14px; }
+  #stroopWord { font-size:46px; font-weight:800; text-align:center; padding:34px 0; letter-spacing:1px; }
+  .stroopBtns { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stroopBtns button { padding:16px; border-radius:16px; border:1px solid rgba(255,255,255,.2); font-size:16px; font-weight:700; color:#fff; cursor:pointer; }
+  .gameHud { display:flex; justify-content:space-between; font-size:14px; opacity:.7; font-variant-numeric:tabular-nums; margin-bottom:8px; }
+
+  #simonGrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:6px 0; }
+  .simonPad { aspect-ratio:1.35; border-radius:20px; border:1px solid rgba(255,255,255,.18); opacity:.45; cursor:pointer; transition:opacity .15s, transform .1s; }
+  .simonPad.lit { opacity:1; transform:scale(1.03); box-shadow:0 0 30px rgba(255,255,255,.25); }
+  #simonMsg { text-align:center; font-size:15px; opacity:.75; padding:10px 0 2px; min-height:32px; }
+
+  #digitShow { font-size:64px; font-weight:200; text-align:center; padding:26px 0; font-variant-numeric:tabular-nums; min-height:130px; letter-spacing:6px; }
+  .keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+  .keypad button { padding:15px; font-size:20px; font-weight:600; border-radius:15px; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }
+  .keypad button:active { background:rgba(255,255,255,.2); }
+
+  #calcQ { font-size:44px; font-weight:300; text-align:center; padding:28px 0; font-variant-numeric:tabular-nums; }
+  .calcOpts { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .calcOpts button { padding:17px; border-radius:16px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); color:#fff; font-size:20px; font-weight:700; cursor:pointer; font-variant-numeric:tabular-nums; }
+
+  /* ---- Pasos ---- */
+  #stepRingWrap { position:relative; width:210px; height:210px; margin:4px auto; }
+  #stepRingWrap svg { transform:rotate(-90deg); }
+  .ringbg { stroke:rgba(255,255,255,.1); }
+  .ringfg { stroke:url(#gradStep); stroke-linecap:round; transition:stroke-dashoffset .4s; }
+  #stepCenter { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  #stepCount { font-size:44px; font-weight:200; font-variant-numeric:tabular-nums; }
+  #stepGoalTxt { font-size:12px; opacity:.5; text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
   #stepDot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#64748b; margin-right:7px; vertical-align:2px; }
   #stepDot.on { background:#34d399; box-shadow:0 0 10px #34d399; animation:pulse 1.4s infinite; }
   @keyframes pulse { 50% { opacity:.45; } }
+  #weekBars { display:flex; gap:7px; align-items:flex-end; height:86px; margin-top:6px; }
+  #weekBars .wb { flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; height:100%; justify-content:flex-end; }
+  #weekBars .bar { width:100%; border-radius:7px 7px 3px 3px; background:linear-gradient(180deg,var(--accA),var(--accB)); min-height:3px; opacity:.85; }
+  #weekBars small { font-size:10px; opacity:.5; text-transform:uppercase; }
+  #sensorStatus { font-size:12.5px; margin-top:10px; opacity:.7; }
 
-  /* ---------- Tiempo ---------- */
+  /* ---- Modo bolsillo ---- */
+  #pocket { position:fixed; inset:0; background:#000; z-index:100; display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+  #pocket.on { display:flex; }
+  #pocketSteps { font-size:54px; font-weight:200; color:#1f2937; font-variant-numeric:tabular-nums; }
+  #pocketHint { font-size:13px; color:#111827; }
+
+  /* ---- Tiempo ---- */
   .seg { display:flex; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:4px; margin-bottom:16px; }
-  .seg button { flex:1; padding:10px; border:none; border-radius:12px; background:transparent; color:#eef2ff; font-size:14px; font-weight:600; cursor:pointer; opacity:.6; }
+  .seg button { flex:1; padding:10px 4px; border:none; border-radius:12px; background:transparent; color:#eef2ff; font-size:13.5px; font-weight:600; cursor:pointer; opacity:.6; }
   .seg button.sel { background:rgba(255,255,255,.14); opacity:1; box-shadow:inset 0 1px 0 rgba(255,255,255,.15); }
   .subview { display:none; } .subview.active { display:block; }
-  #clockBig { font-size:64px; font-weight:100; text-align:center; font-variant-numeric:tabular-nums; letter-spacing:2px; padding:24px 0 4px; }
+  #clockBig { font-size:62px; font-weight:100; text-align:center; font-variant-numeric:tabular-nums; letter-spacing:2px; padding:24px 0 4px; }
   #clockDate { text-align:center; opacity:.6; font-size:16px; text-transform:capitalize; padding-bottom:20px; }
   #laps { list-style:none; margin-top:14px; max-height:180px; overflow-y:auto; }
   #laps li { display:flex; justify-content:space-between; padding:9px 6px; border-bottom:1px solid rgba(255,255,255,.08); font-variant-numeric:tabular-nums; font-size:15px; }
   #laps li span:first-child { opacity:.5; }
 
-  .stepper { display:flex; align-items:center; justify-content:center; gap:18px; margin:10px 0 18px; }
+  .stepper { display:flex; align-items:center; justify-content:center; gap:18px; margin:10px 0 18px; flex-wrap:wrap; }
   .stepper .val { font-size:44px; font-weight:200; font-variant-numeric:tabular-nums; min-width:78px; text-align:center; }
-  .stepper button {
-    width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.2);
-    background:rgba(255,255,255,.09); color:#fff; font-size:24px; cursor:pointer; line-height:1;
-  }
+  .stepper button { width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.09); color:#fff; font-size:24px; cursor:pointer; line-height:1; }
   .stepper button:active { background:rgba(255,255,255,.2); }
   .stepper label { font-size:11px; opacity:.5; text-transform:uppercase; letter-spacing:1px; display:block; text-align:center; margin-top:4px; }
 
   #timerRingWrap { position:relative; width:220px; height:220px; margin:6px auto; display:none; }
   #timerRingWrap svg { transform:rotate(-90deg); }
-  #timerRingWrap .ringbg { stroke:rgba(255,255,255,.1); }
-  #timerRingWrap .ringfg { stroke:url(#grad); stroke-linecap:round; transition:stroke-dashoffset .3s linear; }
+  #timerRingWrap .ringfg { stroke:url(#gradTimer); }
   #timerDisplay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:42px; font-weight:200; font-variant-numeric:tabular-nums; }
 
-  /* ---------- Nav ---------- */
+  /* ---- Ajustes ---- */
+  .setRow { display:flex; align-items:center; justify-content:space-between; padding:13px 2px; border-bottom:1px solid rgba(255,255,255,.07); gap:12px; }
+  .setRow:last-child { border-bottom:none; }
+  .setRow .lbl b { display:block; font-size:15px; font-weight:600; }
+  .setRow .lbl small { opacity:.5; font-size:12px; }
+  .switch { position:relative; width:52px; height:31px; flex-shrink:0; }
+  .switch input { opacity:0; width:100%; height:100%; position:absolute; z-index:2; cursor:pointer; margin:0; }
+  .switch .tr { position:absolute; inset:0; border-radius:99px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.18); transition:background .2s; }
+  .switch .tr::after { content:""; position:absolute; top:3px; left:3px; width:23px; height:23px; border-radius:50%; background:#fff; transition:transform .2s; }
+  .switch input:checked + .tr { background:linear-gradient(135deg,var(--accA),var(--accB)); }
+  .switch input:checked + .tr::after { transform:translateX(21px); }
+  .numCtl { display:flex; align-items:center; gap:10px; }
+  .numCtl button { width:36px; height:36px; border-radius:50%; border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.09); color:#fff; font-size:19px; cursor:pointer; line-height:1; }
+  .numCtl b { min-width:64px; text-align:center; font-variant-numeric:tabular-nums; font-size:16px; }
+  .themeDots { display:flex; gap:12px; }
+  .themeDot { width:38px; height:38px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:all .2s; }
+  .themeDot.sel { border-color:#fff; box-shadow:0 0 14px rgba(255,255,255,.35); transform:scale(1.08); }
+
+  /* ---- Nav ---- */
   nav {
-    display:flex; margin:0 14px; margin-bottom:calc(env(safe-area-inset-bottom, 0px) + 12px);
+    display:flex; margin:0 10px; margin-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
     background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
     border-radius:24px; padding:6px;
     backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%);
     box-shadow:0 8px 30px rgba(0,0,0,.4);
   }
   nav button {
-    flex:1; padding:9px 2px 7px; border:none; background:transparent; color:#eef2ff;
+    flex:1; padding:9px 0 7px; border:none; background:transparent; color:#eef2ff;
     border-radius:18px; cursor:pointer; opacity:.5; transition:all .2s;
-    display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; font-weight:600; letter-spacing:.4px;
+    display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10px; font-weight:600; letter-spacing:.3px;
   }
-  nav button svg { width:22px; height:22px; }
+  nav button svg { width:21px; height:21px; }
   nav button.sel { opacity:1; background:rgba(255,255,255,.13); box-shadow:inset 0 1px 0 rgba(255,255,255,.14); }
 
-  /* ---------- Toast ---------- */
   #toast {
     position:fixed; left:50%; bottom:110px; transform:translateX(-50%) translateY(20px);
-    background:rgba(20,25,45,.9); border:1px solid rgba(255,255,255,.2); color:#fff;
+    background:rgba(20,25,45,.92); border:1px solid rgba(255,255,255,.2); color:#fff;
     padding:12px 20px; border-radius:16px; font-size:14px; opacity:0; pointer-events:none;
-    transition:all .3s; z-index:50; max-width:86vw; text-align:center;
+    transition:all .3s; z-index:200; max-width:86vw; text-align:center;
     backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
   }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
@@ -192,12 +250,20 @@
           <button class="chip sel" data-min="3">3 min</button>
           <button class="chip" data-min="5">5 min</button>
           <button class="chip" data-min="10">10 min</button>
+          <button class="chip" data-min="20">20 min</button>
         </div>
         <h2 style="margin-top:20px">Respiración</h2>
         <div class="chips" id="medPat">
           <button class="chip sel" data-pat="calm">Calma 4·6</button>
           <button class="chip" data-pat="box">Caja 4·4·4·4</button>
           <button class="chip" data-pat="478">Dormir 4·7·8</button>
+          <button class="chip" data-pat="custom">Personal</button>
+        </div>
+        <h2 style="margin-top:20px">Sonido ambiente</h2>
+        <div class="chips" id="medAmb">
+          <button class="chip sel" data-amb="ninguno">Silencio</button>
+          <button class="chip" data-amb="lluvia">Lluvia</button>
+          <button class="chip" data-amb="oceano">Océano</button>
         </div>
         <div style="height:20px"></div>
         <button class="btn" id="medStart">Comenzar sesión</button>
@@ -221,19 +287,108 @@
       </div>
     </section>
 
-    <!-- ============ REACCIÓN ============ -->
-    <section id="view-react" class="view">
-      <div id="reactPad">
-        <div id="reactMain">Toca para empezar</div>
-        <div id="reactSub">5 rondas · toca cuando se ponga verde</div>
+    <!-- ============ MENTE (neuroplasticidad) ============ -->
+    <section id="view-mind" class="view">
+      <div id="mindHome">
+        <p id="tip"></p>
+        <button class="gameCard" data-game="react">
+          <div class="ico">⚡</div>
+          <div><b>Reacción</b><small>Velocidad de procesamiento</small></div>
+          <div class="best" id="bestReact">—</div>
+        </button>
+        <button class="gameCard" data-game="stroop">
+          <div class="ico">🎨</div>
+          <div><b>Stroop</b><small>Control inhibitorio y atención</small></div>
+          <div class="best" id="bestStroop">—</div>
+        </button>
+        <button class="gameCard" data-game="simon">
+          <div class="ico">🔁</div>
+          <div><b>Secuencias</b><small>Memoria de trabajo visoespacial</small></div>
+          <div class="best" id="bestSimon">—</div>
+        </button>
+        <button class="gameCard" data-game="digits">
+          <div class="ico">🔢</div>
+          <div><b>Dígitos</b><small>Amplitud de memoria inmediata</small></div>
+          <div class="best" id="bestDigits">—</div>
+        </button>
+        <button class="gameCard" data-game="calc">
+          <div class="ico">➗</div>
+          <div><b>Cálculo</b><small>Agilidad y flexibilidad cognitiva</small></div>
+          <div class="best" id="bestCalc">—</div>
+        </button>
+        <p class="note">La neuroplasticidad se estimula con práctica <b>breve, diaria y progresiva</b>: la dificultad de cada ejercicio crece contigo. Combínalos con la meditación (atención) y la caminata (BDNF, el "fertilizante" neuronal) para máximo efecto.</p>
       </div>
-      <div class="glass" style="margin-top:14px">
-        <div class="statgrid" style="margin-top:0">
-          <div class="stat"><b id="rxLast">—</b><span>última</span></div>
-          <div class="stat"><b id="rxAvg">—</b><span>promedio</span></div>
-          <div class="stat"><b id="rxBest">—</b><span>récord</span></div>
+
+      <!-- Reacción -->
+      <div class="game" id="game-react">
+        <button class="backBtn" data-back>‹ Mente</button>
+        <div id="reactPad">
+          <div id="reactMain">Toca para empezar</div>
+          <div id="reactSub">5 rondas · toca cuando se ponga verde</div>
         </div>
-        <p class="note">El tiempo de reacción visual típico de un adulto es de 200–300 ms. Entrenar regularmente mejora la atención sostenida.</p>
+        <div class="glass" style="margin-top:14px">
+          <div class="statgrid" style="margin-top:0">
+            <div class="stat"><b id="rxLast">—</b><span>última</span></div>
+            <div class="stat"><b id="rxAvg">—</b><span>promedio</span></div>
+            <div class="stat"><b id="rxBest">—</b><span>récord</span></div>
+          </div>
+          <p class="note">La reacción visual típica de un adulto es de 200–300 ms. Este ejercicio entrena la vía visual-motora y la atención sostenida.</p>
+        </div>
+      </div>
+
+      <!-- Stroop -->
+      <div class="game" id="game-stroop">
+        <button class="backBtn" data-back>‹ Mente</button>
+        <div class="glass">
+          <div class="gameHud"><span id="stroopScore">Aciertos: 0</span><span id="stroopTime">45 s</span></div>
+          <div id="stroopWord">LISTO</div>
+          <div class="stroopBtns" id="stroopBtns"></div>
+          <div style="height:14px"></div>
+          <button class="btn" id="stroopStart">Comenzar</button>
+          <p class="note">Toca el <b>color de la tinta</b>, no lo que dice la palabra. El efecto Stroop entrena la corteza prefrontal: inhibir la respuesta automática de leer fortalece el control ejecutivo.</p>
+        </div>
+      </div>
+
+      <!-- Simon -->
+      <div class="game" id="game-simon">
+        <button class="backBtn" data-back>‹ Mente</button>
+        <div class="glass">
+          <div class="gameHud"><span id="simonLevel">Nivel 1</span><span id="simonBestHud">Récord: —</span></div>
+          <div id="simonGrid">
+            <div class="simonPad" data-p="0" style="background:#6366f1"></div>
+            <div class="simonPad" data-p="1" style="background:#10b981"></div>
+            <div class="simonPad" data-p="2" style="background:#f59e0b"></div>
+            <div class="simonPad" data-p="3" style="background:#ec4899"></div>
+          </div>
+          <div id="simonMsg">Observa la secuencia y repítela</div>
+          <button class="btn" id="simonStart">Comenzar</button>
+          <p class="note">Repetir secuencias cada vez más largas ejercita la memoria de trabajo visoespacial (circuito fronto-parietal), asociada al razonamiento fluido.</p>
+        </div>
+      </div>
+
+      <!-- Dígitos -->
+      <div class="game" id="game-digits">
+        <button class="backBtn" data-back>‹ Mente</button>
+        <div class="glass">
+          <div class="gameHud"><span id="digitLevel">Amplitud: 3</span><span id="digitBestHud">Récord: —</span></div>
+          <div id="digitShow">···</div>
+          <div class="keypad" id="digitPad" style="display:none"></div>
+          <button class="btn" id="digitStart">Comenzar</button>
+          <p class="note">Memoriza los dígitos y escríbelos en orden. La amplitud media es 7±2; ampliarla mejora la retención de información en tiempo real (bucle fonológico).</p>
+        </div>
+      </div>
+
+      <!-- Cálculo -->
+      <div class="game" id="game-calc">
+        <button class="backBtn" data-back>‹ Mente</button>
+        <div class="glass">
+          <div class="gameHud"><span id="calcScore">Aciertos: 0</span><span id="calcTime">60 s</span></div>
+          <div id="calcQ">¿Listo?</div>
+          <div class="calcOpts" id="calcOpts"></div>
+          <div style="height:14px"></div>
+          <button class="btn" id="calcStart">Comenzar</button>
+          <p class="note">El cálculo mental rápido bajo presión de tiempo activa redes fronto-parietales y entrena la velocidad de procesamiento y la flexibilidad cognitiva.</p>
+        </div>
       </div>
     </section>
 
@@ -241,19 +396,42 @@
     <section id="view-steps" class="view">
       <div class="glass">
         <h2><span id="stepDot"></span>Podómetro · hoy</h2>
-        <div class="bignum" id="stepCount">0</div>
-        <div class="sub" id="stepDist">≈ 0 m recorridos</div>
-        <div style="height:18px"></div>
-        <button class="btn" id="stepBtn">Iniciar conteo</button>
+        <div id="stepRingWrap">
+          <svg width="210" height="210" viewBox="0 0 210 210">
+            <defs>
+              <linearGradient id="gradStep" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="var(--accA)"/><stop offset="100%" stop-color="var(--accB)"/>
+              </linearGradient>
+            </defs>
+            <circle class="ringbg" cx="105" cy="105" r="93" fill="none" stroke-width="11"/>
+            <circle class="ringfg" id="stepRingFg" cx="105" cy="105" r="93" fill="none" stroke-width="11"/>
+          </svg>
+          <div id="stepCenter">
+            <div id="stepCount">0</div>
+            <div id="stepGoalTxt">meta 6.000</div>
+          </div>
+        </div>
+        <div class="sub" id="stepDist">≈ 0 m · 0 kcal</div>
+        <div style="height:16px"></div>
+        <div class="row">
+          <button class="btn" id="stepBtn">Iniciar conteo</button>
+          <button class="btn ghost" id="pocketBtn" style="display:none">Modo bolsillo</button>
+        </div>
+        <div id="sensorStatus"></div>
+        <p class="note" id="stepNote">
+          Todo se procesa en tu teléfono con el acelerómetro; nada sale de tu dispositivo.
+          Con el <b>Modo bolsillo</b> la pantalla se ve negra (como apagada, casi sin gasto en pantallas OLED) pero el conteo sigue activo.
+          Los navegadores no permiten leer sensores con el teléfono bloqueado — esa es la alternativa real.
+          Si abres este archivo dentro de un visor o chat, guárdalo y ábrelo directo en tu navegador para que el sensor funcione.
+        </p>
+      </div>
+      <div class="glass">
+        <h2>Últimos 7 días</h2>
+        <div id="weekBars"></div>
         <div class="statgrid">
           <div class="stat"><b id="stepTotal">0</b><span>total histórico</span></div>
-          <div class="stat"><b id="stepKcal">0</b><span>kcal aprox.</span></div>
+          <div class="stat"><b id="stepAvg">0</b><span>media 7 días</span></div>
         </div>
-        <p class="note" id="stepNote">
-          Privacidad total: los pasos se detectan con el acelerómetro del teléfono y nunca salen de tu dispositivo.
-          Mientras el conteo está activo la pantalla se mantiene encendida (puedes bajar el brillo al mínimo):
-          los navegadores no permiten leer sensores con el teléfono bloqueado. Si cierras la app, tu conteo queda guardado.
-        </p>
       </div>
     </section>
 
@@ -291,7 +469,7 @@
               <button class="chip" data-s="60">1 min</button>
               <button class="chip" data-s="300">5 min</button>
               <button class="chip" data-s="600">10 min</button>
-              <button class="chip" data-s="900">15 min</button>
+              <button class="chip" data-s="1800">30 min</button>
             </div>
             <div class="stepper">
               <div>
@@ -311,8 +489,8 @@
           <div id="timerRingWrap">
             <svg width="220" height="220" viewBox="0 0 220 220">
               <defs>
-                <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stop-color="#5b6cff"/><stop offset="100%" stop-color="#a855f7"/>
+                <linearGradient id="gradTimer" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="var(--accA)"/><stop offset="100%" stop-color="var(--accB)"/>
                 </linearGradient>
               </defs>
               <circle class="ringbg" cx="110" cy="110" r="98" fill="none" stroke-width="10"/>
@@ -328,6 +506,77 @@
         </div>
       </div>
     </section>
+
+    <!-- ============ AJUSTES ============ -->
+    <section id="view-cfg" class="view">
+      <div class="glass">
+        <h2>Apariencia</h2>
+        <div class="setRow">
+          <div class="lbl"><b>Tema de color</b><small>Cambia toda la app</small></div>
+          <div class="themeDots" id="themeDots"></div>
+        </div>
+      </div>
+      <div class="glass">
+        <h2>Sonido y respuesta</h2>
+        <div class="setRow">
+          <div class="lbl"><b>Sonidos</b><small>Campanas y alarmas</small></div>
+          <label class="switch"><input type="checkbox" id="cfgSound"><span class="tr"></span></label>
+        </div>
+        <div class="setRow">
+          <div class="lbl"><b>Vibración</b><small>Guía háptica y avisos</small></div>
+          <label class="switch"><input type="checkbox" id="cfgVib"><span class="tr"></span></label>
+        </div>
+      </div>
+      <div class="glass">
+        <h2>Podómetro</h2>
+        <div class="setRow">
+          <div class="lbl"><b>Meta diaria</b><small>pasos</small></div>
+          <div class="numCtl"><button data-cfg="goal" data-d="-500">−</button><b id="vGoal">6.000</b><button data-cfg="goal" data-d="500">+</button></div>
+        </div>
+        <div class="setRow">
+          <div class="lbl"><b>Zancada</b><small>cm por paso</small></div>
+          <div class="numCtl"><button data-cfg="stride" data-d="-2">−</button><b id="vStride">74</b><button data-cfg="stride" data-d="2">+</button></div>
+        </div>
+        <div class="setRow">
+          <div class="lbl"><b>Peso</b><small>kg, para calorías</small></div>
+          <div class="numCtl"><button data-cfg="weight" data-d="-1">−</button><b id="vWeight">70</b><button data-cfg="weight" data-d="1">+</button></div>
+        </div>
+        <div class="setRow">
+          <div class="lbl"><b>Sensibilidad</b><small>sube si pierde pasos, baja si inventa</small></div>
+          <div class="chips" id="cfgSens">
+            <button class="chip" data-sens="baja">Baja</button>
+            <button class="chip sel" data-sens="media">Media</button>
+            <button class="chip" data-sens="alta">Alta</button>
+          </div>
+        </div>
+      </div>
+      <div class="glass">
+        <h2>Respiración personal</h2>
+        <div class="setRow">
+          <div class="lbl"><b>Inhala</b><small>segundos</small></div>
+          <div class="numCtl"><button data-cfg="bIn" data-d="-1">−</button><b id="vBIn">4</b><button data-cfg="bIn" data-d="1">+</button></div>
+        </div>
+        <div class="setRow">
+          <div class="lbl"><b>Sostén</b><small>segundos (0 = saltar)</small></div>
+          <div class="numCtl"><button data-cfg="bHold" data-d="-1">−</button><b id="vBHold">4</b><button data-cfg="bHold" data-d="1">+</button></div>
+        </div>
+        <div class="setRow">
+          <div class="lbl"><b>Exhala</b><small>segundos</small></div>
+          <div class="numCtl"><button data-cfg="bOut" data-d="-1">−</button><b id="vBOut">6</b><button data-cfg="bOut" data-d="1">+</button></div>
+        </div>
+        <div class="setRow">
+          <div class="lbl"><b>Sostén vacío</b><small>segundos (0 = saltar)</small></div>
+          <div class="numCtl"><button data-cfg="bHold2" data-d="-1">−</button><b id="vBHold2">0</b><button data-cfg="bHold2" data-d="1">+</button></div>
+        </div>
+        <p class="note">Elige el patrón "Personal" en Meditar para usar estos valores.</p>
+      </div>
+      <div class="glass">
+        <h2>Privacidad y datos</h2>
+        <p class="note" style="margin-top:0">Zen no usa internet, cuentas ni rastreo. Todos tus datos viven solo en este dispositivo.</p>
+        <div style="height:12px"></div>
+        <button class="btn ghost small" id="wipeBtn">Borrar todos mis datos</button>
+      </div>
+    </section>
   </main>
 
   <nav id="nav">
@@ -335,9 +584,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="6" r="2.6"/><path d="M12 9v5m0 0-5 4m5-4 5 4M5.5 13.5 9 12m9.5 1.5L15 12"/></svg>
       Meditar
     </button>
-    <button data-view="react">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2z"/></svg>
-      Reacción
+    <button data-view="mind">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3A5.5 5.5 0 0 0 4 8.5c0 1.2.3 2.2 1 3.1-.7.9-1 2-1 3.1A5.3 5.3 0 0 0 9.3 20h.2M9.5 3c1.4 0 2.5 1.1 2.5 2.5V18c0 1.1-.9 2-2 2M9.5 3c.1 0 .3 0 .4 0M14.5 3A5.5 5.5 0 0 1 20 8.5c0 1.2-.3 2.2-1 3.1.7.9 1 2 1 3.1A5.3 5.3 0 0 1 14.7 20h-.2M14.5 3C13.1 3 12 4.1 12 5.5"/></svg>
+      Mente
     </button>
     <button data-view="steps">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20h4M14 16h4M7 4c1.8 0 3 1.4 3 3.5S9 12 8 13.5 7 17 7 17M17 2c-1.8 1-2.4 2.6-2 4.5.4 2 .3 3.5-.7 5"/></svg>
@@ -347,59 +596,76 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
       Tiempo
     </button>
+    <button data-view="cfg">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19 12c0-.6.4-1.2.9-1.5l.6-.4-1.5-2.6-.7.2c-.6.2-1.3 0-1.7-.4a7 7 0 0 0-.9-.5c-.5-.3-.9-.8-.9-1.4V4.6h-3l-.1.8c0 .6-.4 1.1-.9 1.4a7 7 0 0 0-.9.5c-.4.4-1.1.6-1.7.4l-.7-.2L5.5 10l.6.4c.5.3.9.9.9 1.5s-.4 1.2-.9 1.5l-.6.4 1.5 2.6.7-.2c.6-.2 1.3 0 1.7.4.3.2.6.4.9.5.5.3.9.8.9 1.4l.1.8h3v-.8c0-.6.4-1.1.9-1.4.3-.1.6-.3.9-.5.4-.4 1.1-.6 1.7-.4l.7.2 1.5-2.6-.6-.4c-.5-.3-.9-.9-.9-1.5Z"/></svg>
+      Ajustes
+    </button>
   </nav>
 </div>
 
+<div id="pocket">
+  <div id="pocketSteps">0</div>
+  <div id="pocketHint">contando pasos · toca 2 veces para salir</div>
+</div>
 <div id="toast"></div>
 
 <script>
 "use strict";
 /* ==========================================================================
-   Zen · Entrenamiento — app 100% local y privada.
-   Sin red, sin analítica, sin cuentas. Todos los datos viven en localStorage.
+   Zen · Entrenamiento — app 100% local y privada. Sin red, sin cuentas.
    ========================================================================== */
-
 const $ = (id) => document.getElementById(id);
 
-/* ---------- Almacenamiento seguro (soporta modo privado sin storage) ---- */
 const store = {
-  get(k, def) {
-    try { const v = localStorage.getItem("zen:" + k); return v === null ? def : JSON.parse(v); }
-    catch { return def; }
-  },
+  get(k, def) { try { const v = localStorage.getItem("zen:" + k); return v === null ? def : JSON.parse(v); } catch { return def; } },
   set(k, v) { try { localStorage.setItem("zen:" + k, JSON.stringify(v)); } catch {} }
 };
-
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
 const pad = (n) => String(n).padStart(2, "0");
 const fmtMMSS = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return pad(Math.floor(s / 60)) + ":" + pad(s % 60); };
 
-function toast(msg, time = 2600) {
+function toast(msg, time = 2800) {
   const t = $("toast");
-  t.textContent = msg;
-  t.classList.add("show");
+  t.textContent = msg; t.classList.add("show");
   clearTimeout(toast._t);
   toast._t = setTimeout(() => t.classList.remove("show"), time);
 }
 
-function vibrate(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {} }
+/* ---------- Configuración ------------------------------------------------ */
+const DEF_CFG = { theme:"aurora", sound:true, vib:true, goal:6000, stride:74, weight:70, sens:"media",
+                  bIn:4, bHold:4, bOut:6, bHold2:0 };
+let cfg = Object.assign({}, DEF_CFG, store.get("cfg", {}));
+function saveCfg() { store.set("cfg", cfg); }
 
-/* ---------- Audio (WebAudio, sin archivos externos) --------------------- */
+const THEMES = {
+  aurora:   { a:"#5b6cff", b:"#8b5cf6", o1:"#3b4fd8", o2:"#7c3aed", o3:"#0ea5b7" },
+  oceano:   { a:"#0ea5e9", b:"#14b8a6", o1:"#075985", o2:"#0f766e", o3:"#4f46e5" },
+  atardecer:{ a:"#f59e0b", b:"#f43f5e", o1:"#92400e", o2:"#9f1239", o3:"#6d28d9" },
+  bosque:   { a:"#22c55e", b:"#84cc16", o1:"#166534", o2:"#3f6212", o3:"#0e7490" }
+};
+function applyTheme(name) {
+  const t = THEMES[name] || THEMES.aurora;
+  const r = document.documentElement.style;
+  r.setProperty("--accA", t.a); r.setProperty("--accB", t.b);
+  r.setProperty("--orb1", t.o1); r.setProperty("--orb2", t.o2); r.setProperty("--orb3", t.o3);
+  document.querySelectorAll(".themeDot").forEach(d => d.classList.toggle("sel", d.dataset.t === name));
+}
+
+function vibrate(p) { try { if (cfg.vib && navigator.vibrate) navigator.vibrate(p); } catch {} }
+
+/* ---------- Audio -------------------------------------------------------- */
 let audioCtx = null;
 function ensureAudio() {
   try {
-    if (!audioCtx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) audioCtx = new AC();
-    }
+    if (!audioCtx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) audioCtx = new AC(); }
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
   } catch {}
 }
-function chime(freq = 528, dur = 1.2, vol = 0.18) {
+function tone(freq, dur, vol, type) {
   try {
-    if (!audioCtx) return;
+    if (!audioCtx || !cfg.sound) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.type = "sine"; o.frequency.value = freq;
+    o.type = type || "sine"; o.frequency.value = freq;
     g.gain.setValueAtTime(0, audioCtx.currentTime);
     g.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.03);
     g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
@@ -407,26 +673,66 @@ function chime(freq = 528, dur = 1.2, vol = 0.18) {
     o.start(); o.stop(audioCtx.currentTime + dur);
   } catch {}
 }
-// Desbloquear audio con el primer gesto (requisito de iOS/Android)
+const chime = (f = 528, d = 1.2, v = 0.18) => tone(f, d, v, "sine");
 document.addEventListener("pointerdown", ensureAudio, { once: true });
+
+/* Sonido ambiente (ruido filtrado, generado localmente) */
+const ambient = { nodes: null, kind: "ninguno" };
+function stopAmbient() {
+  if (ambient.nodes) { try { ambient.nodes.forEach(n => { if (n.stop) n.stop(); n.disconnect(); }); } catch {} ambient.nodes = null; }
+}
+function startAmbient(kind) {
+  stopAmbient();
+  if (kind === "ninguno" || !audioCtx || !cfg.sound) return;
+  try {
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < d.length; i++) { // ruido rosa aproximado (más natural que el blanco)
+      const w = Math.random() * 2 - 1;
+      last = 0.98 * last + 0.02 * w;
+      d[i] = last * 3.5;
+    }
+    const src = audioCtx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const filt = audioCtx.createBiquadFilter(); filt.type = "lowpass";
+    filt.frequency.value = kind === "lluvia" ? 1600 : 600;
+    const g = audioCtx.createGain(); g.gain.value = kind === "lluvia" ? 0.13 : 0.16;
+    src.connect(filt); filt.connect(g); g.connect(audioCtx.destination);
+    const nodes = [src, filt, g];
+    if (kind === "oceano") { // olas: volumen modulado lentamente
+      const lfo = audioCtx.createOscillator(), lg = audioCtx.createGain();
+      lfo.frequency.value = 0.11; lg.gain.value = 0.09;
+      lfo.connect(lg); lg.connect(g.gain); lfo.start();
+      nodes.push(lfo, lg);
+    }
+    src.start();
+    ambient.nodes = nodes;
+  } catch {}
+}
 
 /* ---------- Navegación --------------------------------------------------- */
 $("nav").addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-view]");
-  if (!b) return;
+  const b = e.target.closest("button[data-view]"); if (!b) return;
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("sel", x === b));
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + b.dataset.view));
 });
 
 /* =========================================================================
-   1) MEDITACIÓN — guía de respiración con fases temporizadas
+   MEDITACIÓN
    ========================================================================= */
-const PATTERNS = {
-  calm: [["Inhala", 4], ["Exhala", 6]],
-  box:  [["Inhala", 4], ["Sostén", 4], ["Exhala", 4], ["Sostén", 4]],
-  "478":[["Inhala", 4], ["Sostén", 7], ["Exhala", 8]]
-};
-let med = { running: false, endAt: 0, pattern: "calm", minutes: 3, phaseTimer: 0, tick: 0 };
+function buildPattern(key) {
+  if (key === "custom") {
+    const p = [["Inhala", cfg.bIn]];
+    if (cfg.bHold > 0) p.push(["Sostén", cfg.bHold]);
+    p.push(["Exhala", cfg.bOut]);
+    if (cfg.bHold2 > 0) p.push(["Sostén", cfg.bHold2]);
+    return p;
+  }
+  return { calm: [["Inhala",4],["Exhala",6]],
+           box:  [["Inhala",4],["Sostén",4],["Exhala",4],["Sostén",4]],
+           "478":[["Inhala",4],["Sostén",7],["Exhala",8]] }[key];
+}
+let med = { running:false, endAt:0, pattern:"calm", minutes:3, amb:"ninguno", phaseTimer:0, tick:0, stepIdx:0, countInt:0 };
 
 function chipGroup(containerId, attr, onSel) {
   $(containerId).addEventListener("click", (e) => {
@@ -437,47 +743,46 @@ function chipGroup(containerId, attr, onSel) {
 }
 chipGroup("medDur", "min", v => med.minutes = +v);
 chipGroup("medPat", "pat", v => med.pattern = v);
+chipGroup("medAmb", "amb", v => med.amb = v);
 
 function renderMedStats() {
-  const s = store.get("med", { sessions: 0, minutes: 0, streak: 0, last: "" });
+  const s = store.get("med", { sessions:0, minutes:0, streak:0, last:"" });
   $("stSessions").textContent = s.sessions;
   $("stMinutes").textContent = Math.round(s.minutes);
   $("stStreak").textContent = s.streak;
 }
-
 function medPhaseLoop() {
   if (!med.running) return;
-  const steps = PATTERNS[med.pattern];
+  const steps = buildPattern(med.pattern);
   const [name, secs] = steps[med.stepIdx % steps.length];
   med.stepIdx++;
   $("breathPhase").textContent = name;
-  const circle = $("breathCircle");
-  circle.style.transition = `transform ${secs}s cubic-bezier(.4,0,.4,1)`;
-  circle.style.transform = name === "Inhala" ? "scale(1)" : (name === "Exhala" ? "scale(.72)" : circle.style.transform);
+  const c = $("breathCircle");
+  c.style.transition = `transform ${secs}s cubic-bezier(.4,0,.4,1)`;
+  if (name === "Inhala") c.style.transform = "scale(1)";
+  else if (name === "Exhala") c.style.transform = "scale(.72)";
   vibrate(30);
   let left = secs;
   $("breathCount").textContent = left;
   clearInterval(med.countInt);
-  med.countInt = setInterval(() => {
-    left--;
-    if (left > 0) $("breathCount").textContent = left;
-  }, 1000);
+  med.countInt = setInterval(() => { left--; if (left > 0) $("breathCount").textContent = left; }, 1000);
   med.phaseTimer = setTimeout(medPhaseLoop, secs * 1000);
 }
-
 function medFinish(completed) {
   med.running = false;
   clearTimeout(med.phaseTimer); clearInterval(med.countInt); clearInterval(med.tick);
+  stopAmbient();
   releaseWakeLock("med");
   if (completed) {
     chime(432, 2.2); setTimeout(() => chime(528, 2.4), 350);
     vibrate([120, 80, 120]);
-    const s = store.get("med", { sessions: 0, minutes: 0, streak: 0, last: "" });
+    const s = store.get("med", { sessions:0, minutes:0, streak:0, last:"" });
     s.sessions++; s.minutes += med.minutes;
     const today = todayKey();
     if (s.last !== today) {
       const y = new Date(); y.setDate(y.getDate() - 1);
-      s.streak = (s.last === y.toISOString().slice(0, 10)) ? s.streak + 1 : 1;
+      const yk = y.getFullYear() + "-" + pad(y.getMonth()+1) + "-" + pad(y.getDate());
+      s.streak = (s.last === yk) ? s.streak + 1 : 1;
       s.last = today;
     }
     store.set("med", s);
@@ -487,16 +792,15 @@ function medFinish(completed) {
   $("medActive").style.display = "none";
   $("medSetup").style.display = "block";
 }
-
 $("medStart").addEventListener("click", () => {
   ensureAudio();
-  med.running = true;
-  med.stepIdx = 0;
+  med.running = true; med.stepIdx = 0;
   med.endAt = Date.now() + med.minutes * 60000;
   $("medSetup").style.display = "none";
   $("medActive").style.display = "block";
   $("medRemaining").textContent = fmtMMSS(med.minutes * 60000);
   requestWakeLock("med");
+  startAmbient(med.amb);
   chime(432, 1.4);
   setTimeout(() => { if (med.running) medPhaseLoop(); }, 900);
   med.tick = setInterval(() => {
@@ -509,95 +813,395 @@ $("medStop").addEventListener("click", () => medFinish(false));
 renderMedStats();
 
 /* =========================================================================
-   2) TIEMPO DE REACCIÓN — 5 rondas, promedio y récord
+   MENTE — récords y navegación entre ejercicios
    ========================================================================= */
-const rx = { state: "idle", t0: 0, timeout: 0, results: [], ROUNDS: 5 };
+const TIPS = [
+  "<b>Neuro-dato:</b> el ejercicio aeróbico (como caminar rápido) eleva el BDNF, una proteína que facilita crear nuevas sinapsis.",
+  "<b>Neuro-dato:</b> dormir 7–9 h consolida lo aprendido: la plasticidad ocurre sobre todo durante el sueño profundo.",
+  "<b>Neuro-dato:</b> la novedad y la dificultad progresiva son las señales que más plasticidad inducen. Sube de nivel, no repitas lo fácil.",
+  "<b>Neuro-dato:</b> 10 minutos de meditación mejoran la atención sostenida medible en tareas como estas.",
+  "<b>Neuro-dato:</b> alternar tipos de ejercicio (memoria, inhibición, cálculo) transfiere mejor que machacar uno solo."
+];
+$("tip").innerHTML = TIPS[Math.floor(Math.random() * TIPS.length)];
 
-function rxRender(main, sub) { $("reactMain").textContent = main; $("reactSub").textContent = sub; }
-function rxUpdateStats() {
-  const best = store.get("rxBest", null);
-  $("rxBest").textContent = best ? best + " ms" : "—";
+function bests() { return store.get("best", {}); }
+function setBest(k, v, cmp) {
+  const b = bests();
+  if (b[k] === undefined || cmp(v, b[k])) { b[k] = v; store.set("best", b); renderBests(); return true; }
+  return false;
 }
+function renderBests() {
+  const b = bests();
+  $("bestReact").textContent  = b.react  !== undefined ? b.react + " ms" : "—";
+  $("bestStroop").textContent = b.stroop !== undefined ? b.stroop + " aciertos" : "—";
+  $("bestSimon").textContent  = b.simon  !== undefined ? "nivel " + b.simon : "—";
+  $("bestDigits").textContent = b.digits !== undefined ? b.digits + " dígitos" : "—";
+  $("bestCalc").textContent   = b.calc   !== undefined ? b.calc + " aciertos" : "—";
+  $("simonBestHud").textContent = "Récord: " + (b.simon !== undefined ? b.simon : "—");
+  $("digitBestHud").textContent = "Récord: " + (b.digits !== undefined ? b.digits : "—");
+}
+renderBests();
+
+const gameCleanups = { stroop: null, simon: null, digits: null, calc: null };
+function showGame(id) {
+  $("mindHome").style.display = id ? "none" : "block";
+  document.querySelectorAll(".game").forEach(g => g.classList.toggle("active", g.id === "game-" + id));
+  if (!id) Object.keys(gameCleanups).forEach(k => { if (gameCleanups[k]) { gameCleanups[k](); gameCleanups[k] = null; } });
+}
+$("mindHome").addEventListener("click", (e) => {
+  const c = e.target.closest(".gameCard"); if (c) { ensureAudio(); showGame(c.dataset.game); }
+});
+document.querySelectorAll("[data-back]").forEach(b => b.addEventListener("click", () => showGame(null)));
+
+/* ---- Reacción ---- */
+const rx = { state:"idle", t0:0, timeout:0, results:[], ROUNDS:5 };
+function rxRender(main, sub) { $("reactMain").textContent = main; $("reactSub").textContent = sub; }
 function rxArm() {
   rx.state = "wait";
   $("reactPad").className = "wait";
   rxRender("Espera…", `Ronda ${rx.results.length + 1} de ${rx.ROUNDS} · toca al ver verde`);
   rx.timeout = setTimeout(() => {
-    rx.state = "go";
-    rx.t0 = performance.now();
+    rx.state = "go"; rx.t0 = performance.now();
     $("reactPad").className = "go";
     rxRender("¡TOCA!", "");
   }, 1500 + Math.random() * 2500);
 }
 $("reactPad").addEventListener("pointerdown", () => {
   ensureAudio();
-  if (rx.state === "idle") {
-    rx.results = [];
-    rxArm();
-  } else if (rx.state === "wait") {
-    clearTimeout(rx.timeout);
-    vibrate(80);
+  if (rx.state === "idle") { rx.results = []; rxArm(); }
+  else if (rx.state === "wait") {
+    clearTimeout(rx.timeout); vibrate(80);
     $("reactPad").className = "";
     rxRender("Muy pronto 😅", "Toca para reintentar la ronda");
     rx.state = "early";
-  } else if (rx.state === "early") {
-    rxArm();
-  } else if (rx.state === "go") {
+  }
+  else if (rx.state === "early") rxArm();
+  else if (rx.state === "go") {
     const ms = Math.round(performance.now() - rx.t0);
     rx.results.push(ms);
     $("rxLast").textContent = ms + " ms";
     vibrate(25);
-    const best = store.get("rxBest", null);
-    if (!best || ms < best) { store.set("rxBest", ms); rxUpdateStats(); }
+    if (setBest("react", ms, (a, b) => a < b)) {}
+    $("rxBest").textContent = bests().react + " ms";
     if (rx.results.length >= rx.ROUNDS) {
       const avg = Math.round(rx.results.reduce((a, b) => a + b, 0) / rx.results.length);
       $("rxAvg").textContent = avg + " ms";
       $("reactPad").className = "";
       rxRender(`Promedio: ${avg} ms`, "Toca para jugar de nuevo");
-      rx.state = "idle";
-      chime(660, .5);
+      rx.state = "idle"; chime(660, .5);
     } else {
       $("reactPad").className = "";
       rxRender(ms + " ms", "Toca para la siguiente ronda");
       rx.state = "next";
     }
-  } else if (rx.state === "next") {
-    rxArm();
+  }
+  else if (rx.state === "next") rxArm();
+});
+
+/* ---- Stroop ---- */
+const ST_COLORS = [["ROJO","#f43f5e"],["VERDE","#22c55e"],["AZUL","#3b82f6"],["AMARILLO","#eab308"]];
+const st = { on:false, score:0, endAt:0, int:0, answer:-1 };
+(function buildStroopBtns() {
+  ST_COLORS.forEach(([name, hex], i) => {
+    const b = document.createElement("button");
+    b.textContent = name;
+    b.style.background = hex + "44"; b.style.borderColor = hex;
+    b.addEventListener("click", () => stAnswer(i));
+    $("stroopBtns").appendChild(b);
+  });
+})();
+function stNext() {
+  const word = Math.floor(Math.random() * 4);
+  // 60% incongruente para forzar la inhibición
+  const ink = Math.random() < 0.4 ? word : (word + 1 + Math.floor(Math.random() * 3)) % 4;
+  st.answer = ink;
+  $("stroopWord").textContent = ST_COLORS[word][0];
+  $("stroopWord").style.color = ST_COLORS[ink][1];
+}
+function stAnswer(i) {
+  if (!st.on) return;
+  if (i === st.answer) { st.score++; tone(880, .08, .1); }
+  else { st.score = Math.max(0, st.score - 1); vibrate(60); tone(220, .15, .12); }
+  $("stroopScore").textContent = "Aciertos: " + st.score;
+  stNext();
+}
+$("stroopStart").addEventListener("click", () => {
+  ensureAudio();
+  st.on = true; st.score = 0; st.endAt = Date.now() + 45000;
+  $("stroopScore").textContent = "Aciertos: 0";
+  $("stroopStart").style.display = "none";
+  stNext();
+  clearInterval(st.int);
+  st.int = setInterval(() => {
+    const left = Math.max(0, Math.ceil((st.endAt - Date.now()) / 1000));
+    $("stroopTime").textContent = left + " s";
+    if (left <= 0) {
+      clearInterval(st.int); st.on = false;
+      $("stroopWord").textContent = st.score + " ✓"; $("stroopWord").style.color = "#eef2ff";
+      $("stroopStart").style.display = "block"; $("stroopStart").textContent = "Jugar de nuevo";
+      setBest("stroop", st.score, (a, b) => a > b);
+      chime(660, .8); vibrate([80, 60, 80]);
+    }
+  }, 250);
+});
+gameCleanups.stroop = null; // asignado al salir
+document.querySelector("#game-stroop [data-back]").addEventListener("click", () => {
+  clearInterval(st.int); st.on = false;
+  $("stroopStart").style.display = "block";
+  $("stroopWord").textContent = "LISTO"; $("stroopWord").style.color = "#eef2ff";
+  $("stroopTime").textContent = "45 s";
+});
+
+/* ---- Simon (Secuencias) ---- */
+const SIMON_TONES = [261.6, 329.6, 392.0, 523.3];
+const sm = { seq:[], idx:0, level:0, playing:false, accept:false, timeouts:[] };
+function smFlash(p, dur = 380) {
+  const pad_ = document.querySelector(`.simonPad[data-p="${p}"]`);
+  pad_.classList.add("lit");
+  tone(SIMON_TONES[p], dur / 1000 + .05, .14, "triangle");
+  sm.timeouts.push(setTimeout(() => pad_.classList.remove("lit"), dur));
+}
+function smPlaySeq() {
+  sm.playing = true; sm.accept = false;
+  $("simonMsg").textContent = "Observa…";
+  sm.seq.forEach((p, i) => sm.timeouts.push(setTimeout(() => {
+    smFlash(p);
+    if (i === sm.seq.length - 1) sm.timeouts.push(setTimeout(() => {
+      sm.playing = false; sm.accept = true; sm.idx = 0;
+      $("simonMsg").textContent = "Tu turno";
+    }, 500));
+  }, 650 * i + 400)));
+}
+function smNextLevel() {
+  sm.level++;
+  $("simonLevel").textContent = "Nivel " + sm.level;
+  sm.seq.push(Math.floor(Math.random() * 4));
+  smPlaySeq();
+}
+function smReset(msg) {
+  sm.timeouts.forEach(clearTimeout); sm.timeouts = [];
+  sm.seq = []; sm.level = 0; sm.accept = false; sm.playing = false;
+  $("simonStart").style.display = "block";
+  if (msg) $("simonMsg").textContent = msg;
+}
+$("simonStart").addEventListener("click", () => {
+  ensureAudio();
+  smReset(); $("simonStart").style.display = "none";
+  smNextLevel();
+});
+$("simonGrid").addEventListener("pointerdown", (e) => {
+  const p = e.target.closest(".simonPad"); if (!p || !sm.accept) return;
+  const n = +p.dataset.p;
+  smFlash(n, 220);
+  if (n === sm.seq[sm.idx]) {
+    sm.idx++;
+    if (sm.idx >= sm.seq.length) {
+      sm.accept = false;
+      setBest("simon", sm.level, (a, b) => a > b);
+      $("simonMsg").textContent = "¡Bien! Nivel " + (sm.level + 1);
+      sm.timeouts.push(setTimeout(smNextLevel, 900));
+    }
+  } else {
+    vibrate([90, 60, 90]); tone(150, .4, .15, "sawtooth");
+    const reached = sm.level;
+    smReset(`Fin: llegaste al nivel ${reached}. Toca Comenzar para reintentar.`);
+    $("simonStart").textContent = "Jugar de nuevo";
   }
 });
-rxUpdateStats();
+document.querySelector("#game-simon [data-back]").addEventListener("click", () => smReset("Observa la secuencia y repítela"));
+
+/* ---- Dígitos (amplitud de memoria) ---- */
+const dg = { span:3, target:"", input:"", showing:false, timeouts:[] };
+(function buildDigitPad() {
+  const keys = ["1","2","3","4","5","6","7","8","9","⌫","0","OK"];
+  keys.forEach(k => {
+    const b = document.createElement("button");
+    b.textContent = k;
+    b.addEventListener("click", () => dgKey(k));
+    $("digitPad").appendChild(b);
+  });
+})();
+function dgShowSeq() {
+  dg.showing = true; dg.input = "";
+  dg.target = Array.from({ length: dg.span }, () => Math.floor(Math.random() * 10)).join("");
+  $("digitPad").style.display = "none";
+  $("digitLevel").textContent = "Amplitud: " + dg.span;
+  let i = 0;
+  const step = () => {
+    if (i < dg.target.length) {
+      $("digitShow").textContent = dg.target[i];
+      tone(520 + 40 * (+dg.target[i]), .12, .08);
+      i++;
+      dg.timeouts.push(setTimeout(() => {
+        $("digitShow").textContent = "·";
+        dg.timeouts.push(setTimeout(step, 180));
+      }, 620));
+    } else {
+      dg.showing = false;
+      $("digitShow").textContent = "";
+      $("digitPad").style.display = "grid";
+    }
+  };
+  step();
+}
+function dgKey(k) {
+  if (dg.showing) return;
+  if (k === "⌫") dg.input = dg.input.slice(0, -1);
+  else if (k === "OK") {
+    if (!dg.input) return;
+    if (dg.input === dg.target) {
+      setBest("digits", dg.span, (a, b) => a > b);
+      dg.span++;
+      chime(700, .4); vibrate(30);
+      $("digitShow").textContent = "✓";
+      dg.timeouts.push(setTimeout(dgShowSeq, 800));
+    } else {
+      vibrate([90, 60, 90]); tone(180, .4, .13, "sawtooth");
+      $("digitShow").textContent = "era " + dg.target;
+      $("digitPad").style.display = "none";
+      $("digitStart").style.display = "block";
+      $("digitStart").textContent = "Reintentar";
+      dg.span = Math.max(3, dg.span - 1);
+    }
+    return;
+  }
+  else if (dg.input.length < dg.span + 2) dg.input += k;
+  $("digitShow").textContent = dg.input || "";
+}
+$("digitStart").addEventListener("click", () => {
+  ensureAudio();
+  $("digitStart").style.display = "none";
+  dgShowSeq();
+});
+document.querySelector("#game-digits [data-back]").addEventListener("click", () => {
+  dg.timeouts.forEach(clearTimeout); dg.timeouts = []; dg.showing = false;
+  $("digitShow").textContent = "···"; $("digitPad").style.display = "none";
+  $("digitStart").style.display = "block";
+});
+
+/* ---- Cálculo ---- */
+const ca = { on:false, score:0, endAt:0, int:0, answer:0 };
+function caNext() {
+  const lvl = Math.min(4, 1 + Math.floor(ca.score / 5)); // dificultad progresiva
+  const r = (n) => Math.floor(Math.random() * n) + 1;
+  let a, b, op, res;
+  const kind = Math.floor(Math.random() * 3);
+  if (kind === 0) { a = r(20 * lvl); b = r(20 * lvl); op = "+"; res = a + b; }
+  else if (kind === 1) { a = r(20 * lvl); b = r(a); op = "−"; res = a - b; }
+  else { a = r(4 + 2 * lvl); b = r(9); op = "×"; res = a * b; }
+  ca.answer = res;
+  $("calcQ").textContent = `${a} ${op} ${b}`;
+  const opts = new Set([res]);
+  while (opts.size < 4) {
+    const d = res + (Math.floor(Math.random() * 11) - 5);
+    if (d >= 0 && d !== res) opts.add(d);
+  }
+  const arr = [...opts].sort(() => Math.random() - .5);
+  $("calcOpts").innerHTML = "";
+  arr.forEach(v => {
+    const b2 = document.createElement("button");
+    b2.textContent = v;
+    b2.addEventListener("click", () => {
+      if (!ca.on) return;
+      if (v === ca.answer) { ca.score++; tone(880, .08, .1); }
+      else { ca.score = Math.max(0, ca.score - 1); vibrate(60); tone(220, .15, .12); }
+      $("calcScore").textContent = "Aciertos: " + ca.score;
+      caNext();
+    });
+    $("calcOpts").appendChild(b2);
+  });
+}
+$("calcStart").addEventListener("click", () => {
+  ensureAudio();
+  ca.on = true; ca.score = 0; ca.endAt = Date.now() + 60000;
+  $("calcScore").textContent = "Aciertos: 0";
+  $("calcStart").style.display = "none";
+  caNext();
+  clearInterval(ca.int);
+  ca.int = setInterval(() => {
+    const left = Math.max(0, Math.ceil((ca.endAt - Date.now()) / 1000));
+    $("calcTime").textContent = left + " s";
+    if (left <= 0) {
+      clearInterval(ca.int); ca.on = false;
+      $("calcQ").textContent = ca.score + " ✓";
+      $("calcOpts").innerHTML = "";
+      $("calcStart").style.display = "block"; $("calcStart").textContent = "Jugar de nuevo";
+      setBest("calc", ca.score, (a, b) => a > b);
+      chime(660, .8); vibrate([80, 60, 80]);
+    }
+  }, 250);
+});
+document.querySelector("#game-calc [data-back]").addEventListener("click", () => {
+  clearInterval(ca.int); ca.on = false;
+  $("calcQ").textContent = "¿Listo?"; $("calcOpts").innerHTML = "";
+  $("calcStart").style.display = "block"; $("calcTime").textContent = "60 s";
+});
 
 /* =========================================================================
-   3) PODÓMETRO — acelerómetro + detección de picos + Wake Lock
+   PODÓMETRO
    ========================================================================= */
+const SENS = { baja: 2.6, media: 1.8, alta: 1.15 };
+const STEP_RING_C = 2 * Math.PI * 93;
+$("stepRingFg").style.strokeDasharray = STEP_RING_C;
 const ped = {
-  active: false, steps: 0, total: 0,
-  gravity: { x: 0, y: 0, z: 0 }, lastStepAt: 0, lastMag: 0, rising: false,
-  ALPHA: 0.8, THRESHOLD: 1.8, MIN_STEP_MS: 280
+  active:false, steps:0, total:0, gotData:false, probeT:0,
+  gravity:{ x:0, y:0, z:0 }, lastStepAt:0, rising:false,
+  ALPHA:0.8, MIN_STEP_MS:280
 };
-
+function pedThreshold() { return SENS[cfg.sens] || SENS.media; }
 function pedLoad() {
-  const d = store.get("steps", { day: todayKey(), today: 0, total: 0 });
-  if (d.day !== todayKey()) { d.day = todayKey(); d.today = 0; store.set("steps", d); }
-  ped.steps = d.today; ped.total = d.total;
+  const d = store.get("steps", { day: todayKey(), today: 0, total: 0, hist: {} });
+  if (!d.hist) d.hist = {};
+  if (d.day !== todayKey()) {
+    if (d.today > 0) d.hist[d.day] = (d.hist[d.day] || 0) + d.today;
+    const keys = Object.keys(d.hist).sort();
+    while (keys.length > 30) delete d.hist[keys.shift()];
+    d.day = todayKey(); d.today = 0;
+    store.set("steps", d);
+  }
+  ped.steps = d.today; ped.total = d.total; ped.hist = d.hist;
   pedRender();
 }
 function pedSave() {
-  store.set("steps", { day: todayKey(), today: ped.steps, total: ped.total });
+  store.set("steps", { day: todayKey(), today: ped.steps, total: ped.total, hist: ped.hist || {} });
 }
 function pedRender() {
   $("stepCount").textContent = ped.steps.toLocaleString("es");
   $("stepTotal").textContent = ped.total.toLocaleString("es");
-  $("stepDist").textContent = "≈ " + Math.round(ped.steps * 0.74).toLocaleString("es") + " m recorridos";
-  $("stepKcal").textContent = Math.round(ped.steps * 0.04);
+  $("pocketSteps").textContent = ped.steps.toLocaleString("es");
+  const m = Math.round(ped.steps * cfg.stride / 100);
+  const kcal = Math.round(ped.steps * 0.04 * (cfg.weight / 70));
+  $("stepDist").textContent = "≈ " + m.toLocaleString("es") + " m · " + kcal + " kcal";
+  $("stepGoalTxt").textContent = "meta " + cfg.goal.toLocaleString("es");
+  $("stepRingFg").style.strokeDashoffset = STEP_RING_C * (1 - Math.min(1, ped.steps / cfg.goal));
+  renderWeek();
 }
-
+function renderWeek() {
+  const wrap = $("weekBars");
+  wrap.innerHTML = "";
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const k = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+    const v = (i === 0) ? ped.steps : ((ped.hist || {})[k] || 0);
+    days.push({ v, lbl: ["D","L","M","X","J","V","S"][d.getDay()] });
+  }
+  const max = Math.max(cfg.goal * 0.4, ...days.map(x => x.v));
+  let sum = 0;
+  days.forEach(({ v, lbl }) => {
+    sum += v;
+    const el = document.createElement("div");
+    el.className = "wb";
+    el.innerHTML = `<div class="bar" style="height:${Math.max(3, Math.round(v / max * 62))}px"></div><small>${lbl}</small>`;
+    wrap.appendChild(el);
+  });
+  $("stepAvg").textContent = Math.round(sum / 7).toLocaleString("es");
+}
 function onMotion(e) {
   if (!ped.active) return;
   ped.gotData = true;
   const a = e.accelerationIncludingGravity;
   if (!a || a.x === null) return;
-  // Filtro paso-bajo para aislar la gravedad y quedarnos con el movimiento
   const g = ped.gravity, A = ped.ALPHA;
   g.x = A * g.x + (1 - A) * a.x;
   g.y = A * g.y + (1 - A) * a.y;
@@ -605,57 +1209,82 @@ function onMotion(e) {
   const lx = a.x - g.x, ly = a.y - g.y, lz = a.z - g.z;
   const mag = Math.sqrt(lx * lx + ly * ly + lz * lz);
   const now = Date.now();
-  // Detección de pico: cruce ascendente del umbral con separación mínima entre pasos
-  if (mag > ped.THRESHOLD && !ped.rising && now - ped.lastStepAt > ped.MIN_STEP_MS) {
+  const TH = pedThreshold();
+  if (mag > TH && !ped.rising && now - ped.lastStepAt > ped.MIN_STEP_MS) {
     ped.rising = true;
     ped.lastStepAt = now;
     ped.steps++; ped.total++;
     pedRender();
     if (ped.steps % 20 === 0) pedSave();
-  } else if (mag < ped.THRESHOLD * 0.6) {
+  } else if (mag < TH * 0.6) {
     ped.rising = false;
   }
 }
-
+function sensorStatus(msg, ok) {
+  $("sensorStatus").innerHTML = msg ? (ok ? "🟢 " : "🟠 ") + msg : "";
+}
 async function pedStart() {
-  if (typeof DeviceMotionEvent === "undefined") {
-    toast("Este dispositivo no expone acelerómetro al navegador. Prueba desde un teléfono.");
+  if (window.self !== window.top) {
+    sensorStatus("Estás dentro de un visor integrado que bloquea los sensores. Guarda el archivo y ábrelo directo en Chrome/Safari.", false);
+    toast("Abre el archivo directamente en tu navegador para usar el sensor.", 4200);
     return;
   }
-  // iOS 13+ exige pedir permiso desde un gesto del usuario
+  if (typeof DeviceMotionEvent === "undefined") {
+    sensorStatus("Este dispositivo no expone acelerómetro al navegador.", false);
+    toast("Prueba desde un teléfono.");
+    return;
+  }
   if (typeof DeviceMotionEvent.requestPermission === "function") {
     try {
       const r = await DeviceMotionEvent.requestPermission();
-      if (r !== "granted") { toast("Permiso de movimiento denegado."); return; }
-    } catch { toast("No se pudo pedir permiso de movimiento. Abre la app con https."); return; }
+      if (r !== "granted") { sensorStatus("Permiso de movimiento denegado. Actívalo en Ajustes de Safari.", false); return; }
+    } catch {
+      sensorStatus("iOS solo permite sensores en páginas https o abiertas como archivo local desde Archivos.", false);
+      return;
+    }
   }
-  ped.active = true;
-  ped.gotData = false;
+  ped.active = true; ped.gotData = false;
   window.addEventListener("devicemotion", onMotion);
-  // Si en 4 s no llega ningún dato de movimiento, avisar (p. ej. en un PC)
   clearTimeout(ped.probeT);
   ped.probeT = setTimeout(() => {
-    if (ped.active && !ped.gotData) toast("No se detecta acelerómetro en este dispositivo. Abre la app desde tu teléfono para contar pasos.", 4000);
-  }, 4000);
+    if (ped.active && !ped.gotData) sensorStatus("El sensor no envía datos. En un PC no hay acelerómetro; en el teléfono, abre el archivo directo en el navegador.", false);
+    else if (ped.active) sensorStatus("Sensor activo, contando.", true);
+  }, 3500);
   await requestWakeLock("ped");
   $("stepBtn").textContent = "Pausar conteo";
   $("stepBtn").classList.add("stop");
   $("stepDot").classList.add("on");
-  toast("Contando pasos. Mantén la pantalla encendida (puedes bajar el brillo).", 3500);
+  $("pocketBtn").style.display = "block";
+  sensorStatus("Detectando…", true);
 }
 function pedStop() {
   ped.active = false;
   window.removeEventListener("devicemotion", onMotion);
+  clearTimeout(ped.probeT);
   releaseWakeLock("ped");
   pedSave();
   $("stepBtn").textContent = "Iniciar conteo";
   $("stepBtn").classList.remove("stop");
   $("stepDot").classList.remove("on");
+  $("pocketBtn").style.display = "none";
+  sensorStatus("");
 }
 $("stepBtn").addEventListener("click", () => ped.active ? pedStop() : pedStart());
+
+/* Modo bolsillo: pantalla en negro (como apagada) mientras se cuenta */
+$("pocketBtn").addEventListener("click", () => {
+  $("pocket").classList.add("on");
+  requestWakeLock("ped");
+});
+let pkLast = 0;
+$("pocket").addEventListener("pointerdown", () => {
+  const now = Date.now();
+  if (now - pkLast < 400) $("pocket").classList.remove("on");
+  pkLast = now;
+});
 pedLoad();
 
-/* ---------- Wake Lock compartido (meditación y podómetro) --------------- */
+/* ---------- Wake Lock compartido ----------------------------------------- */
 const wakeLocks = { holders: new Set(), sentinel: null };
 async function requestWakeLock(who) {
   wakeLocks.holders.add(who);
@@ -673,18 +1302,16 @@ function releaseWakeLock(who) {
     wakeLocks.sentinel = null;
   }
 }
-// Al volver de segundo plano, reactivar el wake lock si sigue haciendo falta
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && wakeLocks.holders.size) {
-    const h = wakeLocks.holders.values().next().value;
-    requestWakeLock(h);
+    requestWakeLock(wakeLocks.holders.values().next().value);
   }
   if (document.visibilityState === "hidden") pedSave();
 });
 window.addEventListener("pagehide", pedSave);
 
 /* =========================================================================
-   4) RELOJ — hora y fecha en vivo
+   RELOJ
    ========================================================================= */
 function tickClock() {
   const d = new Date();
@@ -692,14 +1319,11 @@ function tickClock() {
   $("clockBig").textContent = hms;
   $("miniClock").textContent = hms.slice(0, 5);
   try {
-    $("clockDate").textContent = d.toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  } catch {
-    $("clockDate").textContent = d.toDateString();
-  }
+    $("clockDate").textContent = d.toLocaleDateString("es", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  } catch { $("clockDate").textContent = d.toDateString(); }
 }
 setInterval(tickClock, 1000); tickClock();
 
-/* ---------- Sub-navegación de Tiempo ------------------------------------ */
 $("timeSeg").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-sub]"); if (!b) return;
   document.querySelectorAll("#timeSeg button").forEach(x => x.classList.toggle("sel", x === b));
@@ -707,9 +1331,9 @@ $("timeSeg").addEventListener("click", (e) => {
 });
 
 /* =========================================================================
-   5) CRONÓMETRO — basado en timestamps (exacto aunque el móvil se duerma)
+   CRONÓMETRO (timestamps: exacto tras standby)
    ========================================================================= */
-const sw = { running: false, startAt: 0, acc: 0, raf: 0, lastLap: 0, laps: 0 };
+const sw = { running:false, startAt:0, acc:0, raf:0, lastLap:0, laps:0 };
 function swFmt(ms) {
   const cs = Math.floor((ms % 1000) / 10);
   const s = Math.floor(ms / 1000);
@@ -722,27 +1346,21 @@ function swFrame() {
 }
 $("swMain").addEventListener("click", () => {
   if (!sw.running) {
-    sw.running = true;
-    sw.startAt = Date.now();
-    $("swMain").textContent = "Pausar";
-    $("swMain").classList.add("stop");
-    $("swLap").disabled = false;
-    $("swLap").textContent = "Vuelta";
+    sw.running = true; sw.startAt = Date.now();
+    $("swMain").textContent = "Pausar"; $("swMain").classList.add("stop");
+    $("swLap").disabled = false; $("swLap").textContent = "Vuelta";
     swFrame();
   } else {
-    sw.running = false;
-    sw.acc += Date.now() - sw.startAt;
+    sw.running = false; sw.acc += Date.now() - sw.startAt;
     cancelAnimationFrame(sw.raf);
-    $("swMain").textContent = "Continuar";
-    $("swMain").classList.remove("stop");
+    $("swMain").textContent = "Continuar"; $("swMain").classList.remove("stop");
     $("swLap").textContent = "Borrar";
     swFrame();
   }
 });
 $("swLap").addEventListener("click", () => {
   if (sw.running) {
-    const t = swElapsed();
-    sw.laps++;
+    const t = swElapsed(); sw.laps++;
     const li = document.createElement("li");
     li.innerHTML = `<span>Vuelta ${sw.laps}</span><span>+${fmtMMSS(t - sw.lastLap)}</span><span>${fmtMMSS(t)}</span>`;
     $("laps").prepend(li);
@@ -752,18 +1370,16 @@ $("swLap").addEventListener("click", () => {
     $("laps").innerHTML = "";
     $("swDisplay").innerHTML = swFmt(0);
     $("swMain").textContent = "Iniciar";
-    $("swLap").disabled = true;
-    $("swLap").textContent = "Vuelta";
+    $("swLap").disabled = true; $("swLap").textContent = "Vuelta";
   }
 });
 
 /* =========================================================================
-   6) TEMPORIZADOR — sobrevive al standby y a recargas (endTime persistido)
+   TEMPORIZADOR (sobrevive standby y recargas)
    ========================================================================= */
 const RING_C = 2 * Math.PI * 98;
 $("ringFg").style.strokeDasharray = RING_C;
-const tm = { endAt: 0, totalMs: 0, running: false, int: 0, min: 5, sec: 0, alarmInt: 0 };
-
+const tm = { endAt:0, totalMs:0, running:false, int:0, min:5, sec:0, alarmInt:0 };
 function tmRenderSetup() { $("tmMin").textContent = pad(tm.min); $("tmSec").textContent = pad(tm.sec); }
 function tmAdj(dm, ds) {
   tm.min = Math.min(99, Math.max(0, tm.min + dm));
@@ -780,7 +1396,6 @@ $("timerPresets").addEventListener("click", (e) => {
   tm.min = Math.floor(+c.dataset.s / 60); tm.sec = +c.dataset.s % 60;
   tmRenderSetup();
 });
-
 function tmShow(runningUI) {
   $("timerSetup").style.display = runningUI ? "none" : "block";
   $("timerRingWrap").style.display = runningUI ? "block" : "none";
@@ -794,33 +1409,23 @@ function tmTick() {
 }
 function tmStart(ms) {
   ensureAudio();
-  tm.totalMs = ms;
-  tm.endAt = Date.now() + ms;
-  tm.running = true;
+  tm.totalMs = ms; tm.endAt = Date.now() + ms; tm.running = true;
   store.set("timer", { endAt: tm.endAt, totalMs: tm.totalMs });
   tmShow(true);
-  $("tmMain").textContent = "Cancelar";
-  $("tmMain").classList.add("stop");
+  $("tmMain").textContent = "Cancelar"; $("tmMain").classList.add("stop");
   clearInterval(tm.int);
   tm.int = setInterval(tmTick, 200);
   tmTick();
 }
-function tmStopAlarm() {
-  clearInterval(tm.alarmInt); tm.alarmInt = 0;
-  vibrate(0);
-}
+function tmStopAlarm() { clearInterval(tm.alarmInt); tm.alarmInt = 0; vibrate(0); }
 function tmCancel() {
-  tm.running = false;
-  clearInterval(tm.int);
-  tmStopAlarm();
+  tm.running = false; clearInterval(tm.int); tmStopAlarm();
   store.set("timer", null);
   tmShow(false);
-  $("tmMain").textContent = "Iniciar";
-  $("tmMain").classList.remove("stop");
+  $("tmMain").textContent = "Iniciar"; $("tmMain").classList.remove("stop");
 }
 function tmDone() {
-  tm.running = false;
-  clearInterval(tm.int);
+  tm.running = false; clearInterval(tm.int);
   store.set("timer", null);
   $("timerDisplay").textContent = "00:00";
   $("ringFg").style.strokeDashoffset = RING_C;
@@ -832,8 +1437,7 @@ function tmDone() {
     if (++n >= 8) tmStopAlarm();
   }, 900);
   chime(880, .35, .22);
-  $("tmMain").textContent = "Listo ✓";
-  $("tmMain").classList.remove("stop");
+  $("tmMain").textContent = "Listo ✓"; $("tmMain").classList.remove("stop");
   toast("⏰ ¡Tiempo cumplido!");
 }
 $("tmMain").addEventListener("click", () => {
@@ -845,8 +1449,6 @@ $("tmMain").addEventListener("click", () => {
 });
 $("tmReset").addEventListener("click", tmCancel);
 tmRenderSetup();
-
-// Restaurar un temporizador que quedó corriendo (recarga o standby largo)
 (function tmRestore() {
   const saved = store.get("timer", null);
   if (saved && saved.endAt) {
@@ -856,7 +1458,6 @@ tmRenderSetup();
       $("tmMain").textContent = "Cancelar"; $("tmMain").classList.add("stop");
       tm.int = setInterval(tmTick, 200);
       tmTick();
-      // Llevar al usuario a la vista del temporizador
       document.querySelector('nav button[data-view="time"]').click();
       document.querySelector('#timeSeg button[data-sub="timer"]').click();
     } else {
@@ -866,7 +1467,6 @@ tmRenderSetup();
   }
 })();
 
-// Al despertar de standby, recalcular inmediatamente (los intervalos se congelan)
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     if (tm.running) tmTick();
@@ -875,9 +1475,65 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-/* ---------- Robustez global --------------------------------------------- */
+/* =========================================================================
+   AJUSTES
+   ========================================================================= */
+(function buildThemeDots() {
+  Object.entries(THEMES).forEach(([name, t]) => {
+    const d = document.createElement("div");
+    d.className = "themeDot"; d.dataset.t = name;
+    d.style.background = `linear-gradient(135deg, ${t.a}, ${t.b})`;
+    d.setAttribute("role", "button"); d.setAttribute("aria-label", "Tema " + name);
+    d.addEventListener("click", () => { cfg.theme = name; saveCfg(); applyTheme(name); vibrate(20); });
+    $("themeDots").appendChild(d);
+  });
+})();
+applyTheme(cfg.theme);
+
+$("cfgSound").checked = cfg.sound;
+$("cfgVib").checked = cfg.vib;
+$("cfgSound").addEventListener("change", (e) => { cfg.sound = e.target.checked; saveCfg(); if (cfg.sound) { ensureAudio(); chime(660, .3); } });
+$("cfgVib").addEventListener("change", (e) => { cfg.vib = e.target.checked; saveCfg(); vibrate(40); });
+
+const CFG_LIMITS = { goal:[1000, 30000], stride:[40, 120], weight:[30, 180], bIn:[2, 10], bHold:[0, 12], bOut:[2, 14], bHold2:[0, 12] };
+const CFG_VIEWS = { goal:"vGoal", stride:"vStride", weight:"vWeight", bIn:"vBIn", bHold:"vBHold", bOut:"vBOut", bHold2:"vBHold2" };
+function renderCfgNums() {
+  Object.entries(CFG_VIEWS).forEach(([k, id]) => {
+    $(id).textContent = k === "goal" ? cfg[k].toLocaleString("es") : cfg[k];
+  });
+}
+renderCfgNums();
+document.querySelectorAll("[data-cfg]").forEach(b => {
+  b.addEventListener("click", () => {
+    const k = b.dataset.cfg, d = +b.dataset.d, [lo, hi] = CFG_LIMITS[k];
+    cfg[k] = Math.min(hi, Math.max(lo, cfg[k] + d));
+    saveCfg(); renderCfgNums(); pedRender();
+  });
+});
+$("cfgSens").querySelectorAll(".chip").forEach(c => c.classList.toggle("sel", c.dataset.sens === cfg.sens));
+chipGroup("cfgSens", "sens", v => { cfg.sens = v; saveCfg(); });
+
+let wipeArmed = false;
+$("wipeBtn").addEventListener("click", () => {
+  if (!wipeArmed) {
+    wipeArmed = true;
+    $("wipeBtn").textContent = "¿Seguro? Toca otra vez para borrar todo";
+    $("wipeBtn").classList.add("stop"); $("wipeBtn").classList.remove("ghost");
+    setTimeout(() => {
+      wipeArmed = false;
+      $("wipeBtn").textContent = "Borrar todos mis datos";
+      $("wipeBtn").classList.remove("stop"); $("wipeBtn").classList.add("ghost");
+    }, 4000);
+  } else {
+    try {
+      Object.keys(localStorage).filter(k => k.startsWith("zen:")).forEach(k => localStorage.removeItem(k));
+    } catch {}
+    location.reload();
+  }
+});
+
+/* ---------- Robustez global ---------------------------------------------- */
 window.addEventListener("error", (e) => { console.error(e); });
-// Evitar zoom por doble toque en iOS
 let lastTouch = 0;
 document.addEventListener("touchend", (e) => {
   const now = Date.now();
