@@ -111,6 +111,18 @@
   .backBtn { background:none; border:none; color:#eef2ff; opacity:.65; font-size:14px; font-weight:600; cursor:pointer; padding:4px 0 14px; display:flex; align-items:center; gap:6px; }
   #tip { font-size:12.5px; line-height:1.55; opacity:.6; padding:2px 6px 12px; }
   #tip b { opacity:.9; }
+  #chartCv { width:100%; height:150px; display:block; }
+  .pbar { height:8px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; margin:10px 0; }
+  .pbar i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accA),var(--accB)); transition:width .4s; }
+  .gchips { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
+  .gchip { padding:7px 11px; border-radius:11px; font-size:13px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); }
+  .gchip.ok { background:color-mix(in srgb, var(--accA) 26%, transparent); border-color:var(--accA); }
+  .repRow { display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:10px 2px; border-bottom:1px solid rgba(255,255,255,.08); font-size:14px; }
+  .repRow:last-of-type { border-bottom:none; }
+  .repRow .rv { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+  .repRow .up { color:#34d399; } .repRow .dn { color:#fbbf24; }
+  #repIdx { font-size:48px; font-weight:200; text-align:center; font-variant-numeric:tabular-nums; padding:8px 0 0; }
+  #repIdxSub { text-align:center; font-size:13px; opacity:.6; padding-bottom:14px; }
 
   #reactPad {
     height:280px; border-radius:26px; display:flex; flex-direction:column; gap:8px;
@@ -291,6 +303,21 @@
     <section id="view-mind" class="view">
       <div id="mindHome">
         <p id="tip"></p>
+        <div class="glass" style="padding:18px 20px">
+          <h2>Reto 30 días</h2>
+          <div id="retoBody"></div>
+        </div>
+        <div class="glass" style="padding:18px 20px">
+          <h2>Progreso</h2>
+          <canvas id="chartCv"></canvas>
+          <div class="statgrid">
+            <div class="stat"><b id="pgIdx">—</b><span>índice hoy</span></div>
+            <div class="stat"><b id="pgLvl">1</b><span>nivel</span></div>
+            <div class="stat"><b id="pgSes">0</b><span>días entrenados</span></div>
+          </div>
+          <div style="height:10px"></div>
+          <button class="btn ghost small" id="reportBtn">Ver informe</button>
+        </div>
         <button class="gameCard" data-game="react">
           <div class="ico">⚡</div>
           <div><b>Reacción</b><small>Velocidad de procesamiento</small></div>
@@ -389,6 +416,12 @@
           <button class="btn" id="calcStart">Comenzar</button>
           <p class="note">El cálculo mental rápido bajo presión de tiempo activa redes fronto-parietales y entrena la velocidad de procesamiento y la flexibilidad cognitiva.</p>
         </div>
+      </div>
+
+      <!-- Informe -->
+      <div class="game" id="game-report">
+        <button class="backBtn" data-back>‹ Mente</button>
+        <div class="glass" id="reportBody"></div>
       </div>
     </section>
 
@@ -649,6 +682,7 @@ function applyTheme(name) {
   r.setProperty("--accA", t.a); r.setProperty("--accB", t.b);
   r.setProperty("--orb1", t.o1); r.setProperty("--orb2", t.o2); r.setProperty("--orb3", t.o3);
   document.querySelectorAll(".themeDot").forEach(d => d.classList.toggle("sel", d.dataset.t === name));
+  if (typeof drawChart === "function") requestAnimationFrame(() => drawChart());
 }
 
 function vibrate(p) { try { if (cfg.vib && navigator.vibrate) navigator.vibrate(p); } catch {} }
@@ -715,6 +749,8 @@ $("nav").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-view]"); if (!b) return;
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("sel", x === b));
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + b.dataset.view));
+  // El lienzo del gráfico solo tiene ancho cuando la vista es visible
+  if (b.dataset.view === "mind") requestAnimationFrame(() => drawChart());
 });
 
 /* =========================================================================
@@ -885,6 +921,7 @@ $("reactPad").addEventListener("pointerdown", () => {
     $("rxBest").textContent = bests().react + " ms";
     if (rx.results.length >= rx.ROUNDS) {
       const avg = Math.round(rx.results.reduce((a, b) => a + b, 0) / rx.results.length);
+      recordScore("react", avg, "lo");
       $("rxAvg").textContent = avg + " ms";
       $("reactPad").className = "";
       rxRender(`Promedio: ${avg} ms`, "Toca para jugar de nuevo");
@@ -912,8 +949,8 @@ const st = { on:false, score:0, endAt:0, int:0, answer:-1 };
 })();
 function stNext() {
   const word = Math.floor(Math.random() * 4);
-  // 60% incongruente para forzar la inhibición
-  const ink = Math.random() < 0.4 ? word : (word + 1 + Math.floor(Math.random() * 3)) % 4;
+  // Proporción incongruente creciente con el nivel, para forzar la inhibición
+  const ink = Math.random() < DIFF.stroopIncong() ? (word + 1 + Math.floor(Math.random() * 3)) % 4 : word;
   st.answer = ink;
   $("stroopWord").textContent = ST_COLORS[word][0];
   $("stroopWord").style.color = ST_COLORS[ink][1];
@@ -927,7 +964,7 @@ function stAnswer(i) {
 }
 $("stroopStart").addEventListener("click", () => {
   ensureAudio();
-  st.on = true; st.score = 0; st.endAt = Date.now() + 45000;
+  st.on = true; st.score = 0; st.endAt = Date.now() + DIFF.stroopDur() * 1000;
   $("stroopScore").textContent = "Aciertos: 0";
   $("stroopStart").style.display = "none";
   stNext();
@@ -940,6 +977,7 @@ $("stroopStart").addEventListener("click", () => {
       $("stroopWord").textContent = st.score + " ✓"; $("stroopWord").style.color = "#eef2ff";
       $("stroopStart").style.display = "block"; $("stroopStart").textContent = "Jugar de nuevo";
       setBest("stroop", st.score, (a, b) => a > b);
+      recordScore("stroop", st.score, "hi");
       chime(660, .8); vibrate([80, 60, 80]);
     }
   }, 250);
@@ -949,7 +987,7 @@ document.querySelector("#game-stroop [data-back]").addEventListener("click", () 
   clearInterval(st.int); st.on = false;
   $("stroopStart").style.display = "block";
   $("stroopWord").textContent = "LISTO"; $("stroopWord").style.color = "#eef2ff";
-  $("stroopTime").textContent = "45 s";
+  $("stroopTime").textContent = DIFF.stroopDur() + " s";
 });
 
 /* ---- Simon (Secuencias) ---- */
@@ -963,14 +1001,15 @@ function smFlash(p, dur = 380) {
 }
 function smPlaySeq() {
   sm.playing = true; sm.accept = false;
+  const sp = DIFF.simonSpeed(); // más rápido a mayor nivel
   $("simonMsg").textContent = "Observa…";
   sm.seq.forEach((p, i) => sm.timeouts.push(setTimeout(() => {
-    smFlash(p);
+    smFlash(p, Math.min(380, sp - 120));
     if (i === sm.seq.length - 1) sm.timeouts.push(setTimeout(() => {
       sm.playing = false; sm.accept = true; sm.idx = 0;
       $("simonMsg").textContent = "Tu turno";
     }, 500));
-  }, 650 * i + 400)));
+  }, sp * i + 400)));
 }
 function smNextLevel() {
   sm.level++;
@@ -998,6 +1037,7 @@ $("simonGrid").addEventListener("pointerdown", (e) => {
     if (sm.idx >= sm.seq.length) {
       sm.accept = false;
       setBest("simon", sm.level, (a, b) => a > b);
+      recordScore("simon", sm.level, "hi");
       $("simonMsg").textContent = "¡Bien! Nivel " + (sm.level + 1);
       sm.timeouts.push(setTimeout(smNextLevel, 900));
     }
@@ -1026,6 +1066,7 @@ function dgShowSeq() {
   dg.target = Array.from({ length: dg.span }, () => Math.floor(Math.random() * 10)).join("");
   $("digitPad").style.display = "none";
   $("digitLevel").textContent = "Amplitud: " + dg.span;
+  const showMs = DIFF.digitShowMs(); // dígitos más fugaces a mayor nivel
   let i = 0;
   const step = () => {
     if (i < dg.target.length) {
@@ -1035,7 +1076,7 @@ function dgShowSeq() {
       dg.timeouts.push(setTimeout(() => {
         $("digitShow").textContent = "·";
         dg.timeouts.push(setTimeout(step, 180));
-      }, 620));
+      }, showMs));
     } else {
       dg.showing = false;
       $("digitShow").textContent = "";
@@ -1051,6 +1092,7 @@ function dgKey(k) {
     if (!dg.input) return;
     if (dg.input === dg.target) {
       setBest("digits", dg.span, (a, b) => a > b);
+      recordScore("digits", dg.span, "hi");
       dg.span++;
       chime(700, .4); vibrate(30);
       $("digitShow").textContent = "✓";
@@ -1070,6 +1112,7 @@ function dgKey(k) {
 }
 $("digitStart").addEventListener("click", () => {
   ensureAudio();
+  dg.span = Math.max(dg.span, DIFF.digitStartSpan()); // arranque más exigente por nivel
   $("digitStart").style.display = "none";
   dgShowSeq();
 });
@@ -1082,7 +1125,7 @@ document.querySelector("#game-digits [data-back]").addEventListener("click", () 
 /* ---- Cálculo ---- */
 const ca = { on:false, score:0, endAt:0, int:0, answer:0 };
 function caNext() {
-  const lvl = Math.min(4, 1 + Math.floor(ca.score / 5)); // dificultad progresiva
+  const lvl = Math.min(7, 1 + Math.floor(ca.score / 5) + DIFF.calcBoost()); // dificultad progresiva + nivel global
   const r = (n) => Math.floor(Math.random() * n) + 1;
   let a, b, op, res;
   const kind = Math.floor(Math.random() * 3);
@@ -1113,7 +1156,7 @@ function caNext() {
 }
 $("calcStart").addEventListener("click", () => {
   ensureAudio();
-  ca.on = true; ca.score = 0; ca.endAt = Date.now() + 60000;
+  ca.on = true; ca.score = 0; ca.endAt = Date.now() + DIFF.calcDur() * 1000;
   $("calcScore").textContent = "Aciertos: 0";
   $("calcStart").style.display = "none";
   caNext();
@@ -1127,6 +1170,7 @@ $("calcStart").addEventListener("click", () => {
       $("calcOpts").innerHTML = "";
       $("calcStart").style.display = "block"; $("calcStart").textContent = "Jugar de nuevo";
       setBest("calc", ca.score, (a, b) => a > b);
+      recordScore("calc", ca.score, "hi");
       chime(660, .8); vibrate([80, 60, 80]);
     }
   }, 250);
@@ -1134,8 +1178,235 @@ $("calcStart").addEventListener("click", () => {
 document.querySelector("#game-calc [data-back]").addEventListener("click", () => {
   clearInterval(ca.int); ca.on = false;
   $("calcQ").textContent = "¿Listo?"; $("calcOpts").innerHTML = "";
-  $("calcStart").style.display = "block"; $("calcTime").textContent = "60 s";
+  $("calcStart").style.display = "block"; $("calcTime").textContent = DIFF.calcDur() + " s";
 });
+
+/* =========================================================================
+   PROGRESO, RETO 30 DÍAS Y DIFICULTAD EXPONENCIAL
+   ========================================================================= */
+let mind = Object.assign({ level: 0, lastLevelDay: "", challenge: null, hist: [] }, store.get("mind", {}));
+function saveMind() { store.set("mind", mind); }
+
+/* La dificultad de cada ejercicio crece exponencialmente con el nivel */
+const DIFF = {
+  stroopDur:     () => Math.max(20, Math.round(45 * Math.pow(0.95, mind.level))),
+  stroopIncong:  () => Math.min(0.85, 0.60 + 0.02 * mind.level),
+  simonSpeed:    () => Math.max(300, Math.round(650 * Math.pow(0.93, mind.level))),
+  digitShowMs:   () => Math.max(260, Math.round(620 * Math.pow(0.93, mind.level))),
+  digitStartSpan:() => 3 + Math.floor(mind.level / 3),
+  calcDur:       () => Math.max(30, Math.round(60 * Math.pow(0.95, mind.level))),
+  calcBoost:     () => Math.floor(mind.level / 2)
+};
+
+const MIND_GAMES = ["react", "stroop", "simon", "digits", "calc"];
+const GAME_META = {
+  react:  { n: "Reacción",   ico: "⚡", u: " ms", lowIsGood: true },
+  stroop: { n: "Stroop",     ico: "🎨", u: "" },
+  simon:  { n: "Secuencias", ico: "🔁", u: "" },
+  digits: { n: "Dígitos",    ico: "🔢", u: "" },
+  calc:   { n: "Cálculo",    ico: "➗", u: "" }
+};
+const clamp100 = (x) => Math.max(0, Math.min(100, x));
+const NORM = {
+  react:  v => clamp100((500 - v) / 3.5),
+  stroop: v => clamp100(v * 2.5),
+  simon:  v => clamp100(v * 8.5),
+  digits: v => clamp100((v - 2) * 11),
+  calc:   v => clamp100(v * 3.4)
+};
+function calcIdx(g) {
+  const ks = Object.keys(g).filter(k => NORM[k]);
+  if (!ks.length) return null;
+  return Math.round(ks.reduce((s, k) => s + NORM[k](g[k]), 0) / ks.length * 10);
+}
+function todayRec(create) {
+  let r = mind.hist.find(h => h.d === todayKey());
+  if (!r && create) { r = { d: todayKey(), g: {} }; mind.hist.push(r); }
+  return r;
+}
+function recordScore(game, val, dir) {
+  const r = todayRec(true);
+  if (r.g[game] === undefined || (dir === "lo" ? val < r.g[game] : val > r.g[game])) r.g[game] = val;
+  r.idx = calcIdx(r.g); r.lvl = mind.level;
+  if (mind.hist.length > 120) mind.hist = mind.hist.slice(-120);
+  saveMind();
+  renderMind();
+  checkDailyCompletion(r);
+}
+function checkDailyCompletion(r) {
+  if (!MIND_GAMES.every(k => r.g[k] !== undefined)) return;
+  const today = todayKey();
+  const ch = mind.challenge;
+  const isNewChDay = ch && ch.days.length < 30 && !ch.days.includes(today);
+  if (isNewChDay) ch.days.push(today);
+  if (mind.lastLevelDay !== today) {
+    mind.lastLevelDay = today;
+    const prev = mind.hist.filter(h => h.d !== today && h.idx != null).slice(-3);
+    const avg = prev.length ? prev.reduce((s, h) => s + h.idx, 0) / prev.length : -1;
+    if (avg < 0 || r.idx >= avg) {
+      mind.level++;
+      toast(`¡Sesión completa! La dificultad sube al nivel ${mind.level + 1} 📈`, 4200);
+    } else if (r.idx < avg * 0.7) {
+      mind.level = Math.max(0, mind.level - 1);
+      toast("Sesión completa. Bajamos un nivel para consolidar la base.", 4200);
+    } else {
+      toast("Sesión completa. Iguala tu media para subir de nivel.", 4200);
+    }
+    chime(700, .6); vibrate([60, 40, 60]);
+  }
+  saveMind(); renderMind();
+  if (isNewChDay) {
+    if (ch.days.length >= 30) toast("🏆 ¡Reto de 30 días completado!", 5000);
+    setTimeout(() => { buildReport(); showGame("report"); }, 1300);
+  }
+}
+function renderReto() {
+  const el = $("retoBody"), ch = mind.challenge;
+  if (!ch) {
+    el.innerHTML = `<p class="note" style="margin-top:0">Completa los 5 ejercicios cada día durante 30 días. La dificultad crece de forma exponencial con tu rendimiento, y cada sesión completa genera un informe.</p>
+      <div style="height:12px"></div><button class="btn small" id="retoStart">Iniciar reto de 30 días</button>`;
+    return;
+  }
+  const done = ch.days.length, today = todayKey();
+  if (done >= 30) {
+    el.innerHTML = `<p style="font-size:15px">🏆 <b>Reto completado</b> — 30 días de entrenamiento. Tu cerebro lo nota.</p>
+      <div class="pbar"><i style="width:100%"></i></div>
+      <div style="height:8px"></div><button class="btn small" id="retoStart">Empezar un nuevo reto</button>`;
+    return;
+  }
+  const r = todayRec(false), g = r ? r.g : {};
+  const doneToday = ch.days.includes(today);
+  const dayN = Math.min(30, done + (doneToday ? 0 : 1));
+  const chips = MIND_GAMES.map(k =>
+    `<span class="gchip ${g[k] !== undefined ? "ok" : ""}">${GAME_META[k].ico} ${GAME_META[k].n}${g[k] !== undefined ? " ✓" : ""}</span>`).join("");
+  el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline">
+      <b style="font-size:17px">Día ${dayN} de 30</b><span style="opacity:.6;font-size:13px">${done} completados</span></div>
+    <div class="pbar"><i style="width:${Math.round(done / 30 * 100)}%"></i></div>
+    <div style="font-size:13px;opacity:.65">${doneToday ? "Sesión de hoy completada ✓ Vuelve mañana." : "Ejercicios de hoy:"}</div>
+    <div class="gchips">${chips}</div>`;
+}
+$("retoBody").addEventListener("click", (e) => {
+  if (e.target.id === "retoStart") {
+    mind.challenge = { start: todayKey(), days: [] };
+    saveMind(); renderMind();
+    toast("Reto iniciado 💪 Completa los 5 ejercicios hoy.", 3800);
+  }
+});
+$("reportBtn").addEventListener("click", () => { buildReport(); showGame("report"); });
+
+function prevValue(game, beforeDate) {
+  for (let i = mind.hist.length - 1; i >= 0; i--) {
+    const h = mind.hist[i];
+    if (h.d < beforeDate && h.g[game] !== undefined) return h.g[game];
+  }
+  return null;
+}
+function buildReport() {
+  const body = $("reportBody");
+  const recs = mind.hist.filter(h => h.idx != null);
+  if (!recs.length) {
+    body.innerHTML = `<h2>Informe</h2><p class="note" style="margin-top:0">Aún no hay datos. Juega los ejercicios de Mente y tu informe aparecerá aquí automáticamente.</p>`;
+    return;
+  }
+  const r = recs[recs.length - 1];
+  const prev = recs.filter(h => h.d < r.d).slice(-3);
+  const avg = prev.length ? Math.round(prev.reduce((s, h) => s + h.idx, 0) / prev.length) : null;
+  const delta = avg !== null ? r.idx - avg : null;
+  const deltaTxt = delta === null ? "primera sesión registrada"
+    : delta >= 0 ? `▲ ${delta} sobre tu media reciente (${avg})` : `▼ ${-delta} bajo tu media reciente (${avg})`;
+  const fecha = new Date(r.d + "T12:00").toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
+  let rows = "", weakest = null, weakestScore = 101;
+  MIND_GAMES.forEach(k => {
+    const m = GAME_META[k], v = r.g[k];
+    if (v === undefined) { rows += `<div class="repRow"><span>${m.ico} ${m.n}</span><span class="rv" style="opacity:.4">sin jugar hoy</span></div>`; return; }
+    const pv = prevValue(k, r.d);
+    let trend = "";
+    if (pv !== null && pv !== v) {
+      const better = m.lowIsGood ? v < pv : v > pv;
+      trend = better ? ` <span class="up">↑</span>` : ` <span class="dn">↓</span>`;
+    }
+    const norm = NORM[k](v);
+    if (norm < weakestScore) { weakestScore = norm; weakest = k; }
+    rows += `<div class="repRow"><span>${m.ico} ${m.n}</span><span class="rv">${v}${m.u}${pv !== null ? ` <small style="opacity:.45">antes ${pv}${m.u}</small>` : ""}${trend}</span></div>`;
+  });
+  const ADVICE = {
+    react:  "Tu mayor margen está en la velocidad de reacción: prueba una ronda tras 5 minutos de respiración; el estado de calma-alerta la mejora.",
+    stroop: "Tu mayor margen está en el control inhibitorio: una ronda extra de Stroop al día fortalece la corteza prefrontal.",
+    simon:  "Tu mayor margen está en la memoria visoespacial: repite Secuencias intentando agrupar los colores en patrones.",
+    digits: "Tu mayor margen está en la retención inmediata: en Dígitos, agrupa los números de 2 en 2 (así trabaja la memoria experta).",
+    calc:   "Tu mayor margen está en la agilidad de cálculo: una ronda diaria de 60 segundos es suficiente para ver mejora en 2 semanas."
+  };
+  const ch = mind.challenge;
+  const retoLine = ch ? (ch.days.length >= 30 ? "🏆 Reto de 30 días completado." : `Reto: ${ch.days.length}/30 días completados.`) : "Sin reto activo — inícialo en Mente para progresar con estructura.";
+  body.innerHTML = `<h2>Informe · ${fecha}</h2>
+    <div id="repIdx">${r.idx}</div>
+    <div id="repIdxSub">índice cognitivo (0–1000) · ${deltaTxt}</div>
+    ${rows}
+    <div style="height:14px"></div>
+    <div class="repRow" style="border:none"><span>Nivel de dificultad</span><span class="rv">${(r.lvl ?? mind.level) + 1}</span></div>
+    <p class="note" style="margin-top:6px">${retoLine}</p>
+    ${weakest ? `<p class="note">${ADVICE[weakest]}</p>` : ""}
+    <p class="note">Días entrenados: ${recs.length} · La curva completa está en Mente → Progreso.</p>`;
+}
+function drawChart() {
+  const cv = $("chartCv");
+  if (!cv) return;
+  const W = cv.clientWidth, H = 150;
+  if (!W || W < 40) return;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const c = cv.getContext("2d");
+  c.scale(dpr, dpr); c.clearRect(0, 0, W, H);
+  const pts = mind.hist.filter(h => h.idx != null).slice(-60);
+  c.font = "12px -apple-system, sans-serif";
+  if (pts.length < 2) {
+    c.fillStyle = "rgba(255,255,255,.45)"; c.textAlign = "center";
+    c.fillText(pts.length ? "Completa otra sesión para ver tu curva" : "Tu progreso aparecerá aquí", W / 2, H / 2);
+    return;
+  }
+  const acc = getComputedStyle(document.documentElement).getPropertyValue("--accA").trim() || "#5b6cff";
+  const P = { l: 34, r: 10, t: 12, b: 20 };
+  const vals = pts.map(p => p.idx);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const padV = Math.max(30, (hi - lo) * 0.2); lo = Math.max(0, lo - padV); hi = Math.min(1000, hi + padV);
+  const X = (i) => P.l + (W - P.l - P.r) * (pts.length === 1 ? 0.5 : i / (pts.length - 1));
+  const Y = (v) => P.t + (H - P.t - P.b) * (1 - (v - lo) / (hi - lo || 1));
+  c.strokeStyle = "rgba(255,255,255,.10)"; c.fillStyle = "rgba(255,255,255,.45)"; c.textAlign = "left"; c.lineWidth = 1;
+  [lo, (lo + hi) / 2, hi].forEach(v => {
+    const y = Y(v);
+    c.beginPath(); c.moveTo(P.l, y); c.lineTo(W - P.r, y); c.stroke();
+    c.fillText(String(Math.round(v)), 2, y + 4);
+  });
+  const area = c.createLinearGradient(0, P.t, 0, H - P.b);
+  area.addColorStop(0, acc + "55"); area.addColorStop(1, acc + "00");
+  c.beginPath();
+  pts.forEach((p, i) => i ? c.lineTo(X(i), Y(p.idx)) : c.moveTo(X(0), Y(p.idx)));
+  c.lineTo(X(pts.length - 1), H - P.b); c.lineTo(X(0), H - P.b); c.closePath();
+  c.fillStyle = area; c.fill();
+  c.beginPath();
+  pts.forEach((p, i) => i ? c.lineTo(X(i), Y(p.idx)) : c.moveTo(X(0), Y(p.idx)));
+  c.strokeStyle = acc; c.lineWidth = 2.5; c.lineJoin = "round"; c.stroke();
+  pts.forEach((p, i) => {
+    c.beginPath(); c.arc(X(i), Y(p.idx), i === pts.length - 1 ? 4.5 : 2.5, 0, 7);
+    c.fillStyle = i === pts.length - 1 ? "#fff" : acc; c.fill();
+  });
+  c.fillStyle = "rgba(255,255,255,.5)"; c.textAlign = "left";
+  const fD = (d) => d.slice(8, 10) + "/" + d.slice(5, 7);
+  c.fillText(fD(pts[0].d), P.l, H - 5);
+  c.textAlign = "right"; c.fillText(fD(pts[pts.length - 1].d), W - P.r, H - 5);
+}
+function renderMind() {
+  const recs = mind.hist.filter(h => h.idx != null);
+  const today = todayRec(false);
+  $("pgIdx").textContent = today && today.idx != null ? today.idx : (recs.length ? recs[recs.length - 1].idx : "—");
+  $("pgLvl").textContent = mind.level + 1;
+  $("pgSes").textContent = recs.length;
+  if (!st.on) $("stroopTime").textContent = DIFF.stroopDur() + " s";
+  if (!ca.on) $("calcTime").textContent = DIFF.calcDur() + " s";
+  renderReto();
+  requestAnimationFrame(drawChart);
+}
+renderMind();
 
 /* =========================================================================
    PODÓMETRO
