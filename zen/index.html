@@ -21,6 +21,34 @@
     touch-action:manipulation; user-select:none; -webkit-user-select:none;
     position:fixed; inset:0;
   }
+  /* ---------- Modo claro (liquid glass sobre fondo perla) ---------- */
+  body.light { background:#eef0f7; color:#212842; }
+  body.light .glass, body.light .gameCard, body.light #reactPad {
+    background:rgba(255,255,255,.6); border-color:rgba(35,45,90,.13);
+    box-shadow:0 8px 26px rgba(50,70,130,.14), inset 0 1px 0 rgba(255,255,255,.7);
+  }
+  body.light #reactPad.wait { background:rgba(244,63,94,.30); border-color:rgba(244,63,94,.55); }
+  body.light #reactPad.go   { background:rgba(16,185,129,.40); border-color:rgba(16,185,129,.65); }
+  body.light .chip, body.light .keypad button, body.light .calcOpts button,
+  body.light .stepper button, body.light .numCtl button, body.light .btn.ghost, body.light .gchip, body.light .pbar {
+    background:rgba(40,55,110,.08); border-color:rgba(35,45,90,.16); color:#212842;
+  }
+  body.light .chip.sel { background:color-mix(in srgb, var(--accA) 26%, white); border-color:var(--accA); }
+  body.light .gchip.ok { background:color-mix(in srgb, var(--accA) 22%, white); border-color:var(--accA); }
+  body.light .seg { background:rgba(40,55,110,.07); border-color:rgba(35,45,90,.12); }
+  body.light .seg button { color:#212842; }
+  body.light .seg button.sel, body.light nav button.sel { background:rgba(255,255,255,.8); }
+  body.light .stat { background:rgba(40,55,110,.06); border-color:rgba(35,45,90,.1); }
+  body.light nav { background:rgba(255,255,255,.65); border-color:rgba(35,45,90,.13); box-shadow:0 8px 26px rgba(50,70,130,.18); }
+  body.light nav button, body.light .backBtn { color:#212842; }
+  body.light .switch .tr { background:rgba(40,55,110,.18); border-color:rgba(35,45,90,.12); }
+  body.light #toast { background:rgba(255,255,255,.95); color:#212842; border-color:rgba(35,45,90,.16); }
+  body.light .ringbg { stroke:rgba(40,55,110,.13); }
+  body.light #laps li, body.light .repRow, body.light .setRow { border-color:rgba(35,45,90,.1); }
+  body.light .themeDot.sel { border-color:#212842; box-shadow:0 0 10px rgba(0,0,0,.2); }
+  body.light .orb { opacity:.35; }
+  body.light .stroopBtns button { color:#212842; }
+  body.light #breathCircle { border-color:rgba(90,110,200,.5); }
   .bg { position:fixed; inset:0; z-index:0; overflow:hidden; }
   .orb { position:absolute; border-radius:50%; filter:blur(90px); opacity:.55; will-change:transform; transition:background 1s; }
   .orb1 { width:60vmax; height:60vmax; left:-20vmax; top:-15vmax; background:radial-gradient(circle,var(--orb1),transparent 70%); animation:drift1 26s ease-in-out infinite alternate; }
@@ -90,6 +118,8 @@
     display:flex; align-items:center; justify-content:center; flex-direction:column;
     transform:scale(.72); transition:transform 4s cubic-bezier(.4,0,.4,1);
   }
+  @keyframes freeFloat { 0%,100% { transform:scale(.72); } 50% { transform:scale(1); } }
+  #breathCircle.freeFloat { animation:freeFloat 10s ease-in-out infinite; }
   #breathPhase { font-size:21px; font-weight:600; letter-spacing:1px; }
   #breathCount { font-size:15px; opacity:.6; margin-top:4px; font-variant-numeric:tabular-nums; }
   #medRemaining { margin-top:18px; font-size:30px; font-weight:200; font-variant-numeric:tabular-nums; opacity:.85; }
@@ -270,6 +300,7 @@
           <button class="chip" data-pat="box">Caja 4·4·4·4</button>
           <button class="chip" data-pat="478">Dormir 4·7·8</button>
           <button class="chip" data-pat="custom">Personal</button>
+          <button class="chip" data-pat="free">Libre</button>
         </div>
         <h2 style="margin-top:20px">Sonido ambiente</h2>
         <div class="chips" id="medAmb">
@@ -544,9 +575,29 @@
     <section id="view-cfg" class="view">
       <div class="glass">
         <h2>Apariencia</h2>
+        <div class="setRow" style="display:block">
+          <div class="lbl" style="margin-bottom:10px"><b>Modo</b></div>
+          <div class="chips" id="cfgMode">
+            <button class="chip" data-mode="auto">Auto</button>
+            <button class="chip" data-mode="dark">Oscuro</button>
+            <button class="chip" data-mode="light">Claro</button>
+          </div>
+        </div>
+        <div class="setRow" style="display:block">
+          <div class="lbl" style="margin-bottom:10px"><b>Tema de color</b></div>
+          <div class="themeDots" id="themeDots" style="flex-wrap:wrap"></div>
+        </div>
+        <div class="setRow" style="display:block">
+          <div class="lbl" style="margin-bottom:10px"><b>Tamaño del texto</b></div>
+          <div class="chips" id="cfgFsize">
+            <button class="chip" data-fs="s">Compacto</button>
+            <button class="chip" data-fs="m">Normal</button>
+            <button class="chip" data-fs="l">Grande</button>
+          </div>
+        </div>
         <div class="setRow">
-          <div class="lbl"><b>Tema de color</b><small>Cambia toda la app</small></div>
-          <div class="themeDots" id="themeDots"></div>
+          <div class="lbl"><b>Fondo animado</b><small>desactívalo para ahorrar batería</small></div>
+          <label class="switch"><input type="checkbox" id="cfgOrbs"><span class="tr"></span></label>
         </div>
       </div>
       <div class="glass">
@@ -558,6 +609,25 @@
         <div class="setRow">
           <div class="lbl"><b>Vibración</b><small>Guía háptica y avisos</small></div>
           <label class="switch"><input type="checkbox" id="cfgVib"><span class="tr"></span></label>
+        </div>
+        <div class="setRow" style="display:block">
+          <div class="lbl" style="margin-bottom:10px"><b>Volumen ambiente</b><small> · lluvia y océano</small></div>
+          <div class="chips" id="cfgAmbVol">
+            <button class="chip" data-vol="0.6">Bajo</button>
+            <button class="chip" data-vol="1">Medio</button>
+            <button class="chip" data-vol="1.6">Alto</button>
+          </div>
+        </div>
+      </div>
+      <div class="glass">
+        <h2>Reloj</h2>
+        <div class="setRow">
+          <div class="lbl"><b>Formato de 24 horas</b><small>si no, 12 h con am/pm</small></div>
+          <label class="switch"><input type="checkbox" id="cfgH24"><span class="tr"></span></label>
+        </div>
+        <div class="setRow">
+          <div class="lbl"><b>Mostrar segundos</b></div>
+          <label class="switch"><input type="checkbox" id="cfgSec"><span class="tr"></span></label>
         </div>
       </div>
       <div class="glass">
@@ -605,8 +675,14 @@
       </div>
       <div class="glass">
         <h2>Privacidad y datos</h2>
-        <p class="note" style="margin-top:0">Zen no usa internet, cuentas ni rastreo. Todos tus datos viven solo en este dispositivo.</p>
+        <p class="note" style="margin-top:0">Zen no usa internet, cuentas ni rastreo. Todos tus datos viven solo en este dispositivo. Exporta una copia para no perder tu progreso si cambias de teléfono.</p>
         <div style="height:12px"></div>
+        <div class="row">
+          <button class="btn ghost small" id="expBtn">Exportar copia</button>
+          <button class="btn ghost small" id="impBtn">Importar copia</button>
+        </div>
+        <input type="file" id="impFile" accept="application/json,.json" style="display:none">
+        <div style="height:10px"></div>
         <button class="btn ghost small" id="wipeBtn">Borrar todos mis datos</button>
       </div>
     </section>
@@ -665,7 +741,9 @@ function toast(msg, time = 2800) {
 }
 
 /* ---------- Configuración ------------------------------------------------ */
-const DEF_CFG = { theme:"aurora", sound:true, vib:true, goal:6000, stride:74, weight:70, sens:"media",
+const DEF_CFG = { theme:"aurora", mode:"auto", orbs:true, fsize:"m", ambVol:1,
+                  sound:true, vib:true, h24:true, showSec:true,
+                  goal:6000, stride:74, weight:70, sens:"media",
                   bIn:4, bHold:4, bOut:6, bHold2:0 };
 let cfg = Object.assign({}, DEF_CFG, store.get("cfg", {}));
 function saveCfg() { store.set("cfg", cfg); }
@@ -674,7 +752,9 @@ const THEMES = {
   aurora:   { a:"#5b6cff", b:"#8b5cf6", o1:"#3b4fd8", o2:"#7c3aed", o3:"#0ea5b7" },
   oceano:   { a:"#0ea5e9", b:"#14b8a6", o1:"#075985", o2:"#0f766e", o3:"#4f46e5" },
   atardecer:{ a:"#f59e0b", b:"#f43f5e", o1:"#92400e", o2:"#9f1239", o3:"#6d28d9" },
-  bosque:   { a:"#22c55e", b:"#84cc16", o1:"#166534", o2:"#3f6212", o3:"#0e7490" }
+  bosque:   { a:"#22c55e", b:"#84cc16", o1:"#166534", o2:"#3f6212", o3:"#0e7490" },
+  sakura:   { a:"#ec4899", b:"#a855f7", o1:"#9d174d", o2:"#6b21a8", o3:"#0e7490" },
+  grafito:  { a:"#94a3b8", b:"#64748b", o1:"#334155", o2:"#475569", o3:"#1e293b" }
 };
 function applyTheme(name) {
   const t = THEMES[name] || THEMES.aurora;
@@ -683,6 +763,20 @@ function applyTheme(name) {
   r.setProperty("--orb1", t.o1); r.setProperty("--orb2", t.o2); r.setProperty("--orb3", t.o3);
   document.querySelectorAll(".themeDot").forEach(d => d.classList.toggle("sel", d.dataset.t === name));
   if (typeof drawChart === "function") requestAnimationFrame(() => drawChart());
+}
+const mqLight = window.matchMedia ? matchMedia("(prefers-color-scheme: light)") : null;
+function applyMode() {
+  const light = cfg.mode === "light" || (cfg.mode === "auto" && mqLight && mqLight.matches);
+  document.body.classList.toggle("light", light);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = light ? "#eef0f7" : "#0b0f1a";
+  if (typeof drawChart === "function") requestAnimationFrame(() => drawChart());
+}
+if (mqLight && mqLight.addEventListener) mqLight.addEventListener("change", () => { if (cfg.mode === "auto") applyMode(); });
+function applyDisplay() {
+  try { document.body.style.zoom = ({ s: 0.92, m: 1, l: 1.12 })[cfg.fsize] || 1; } catch {}
+  const bg = document.querySelector(".bg");
+  if (bg) bg.style.display = cfg.orbs ? "block" : "none";
 }
 
 function vibrate(p) { try { if (cfg.vib && navigator.vibrate) navigator.vibrate(p); } catch {} }
@@ -711,12 +805,14 @@ const chime = (f = 528, d = 1.2, v = 0.18) => tone(f, d, v, "sine");
 document.addEventListener("pointerdown", ensureAudio, { once: true });
 
 /* Sonido ambiente (ruido filtrado, generado localmente) */
-const ambient = { nodes: null, kind: "ninguno" };
+const ambient = { nodes: null, kind: "ninguno", playing: false };
 function stopAmbient() {
   if (ambient.nodes) { try { ambient.nodes.forEach(n => { if (n.stop) n.stop(); n.disconnect(); }); } catch {} ambient.nodes = null; }
+  ambient.playing = false;
 }
 function startAmbient(kind) {
   stopAmbient();
+  ambient.kind = kind; ambient.playing = kind !== "ninguno";
   if (kind === "ninguno" || !audioCtx || !cfg.sound) return;
   try {
     const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
@@ -730,12 +826,12 @@ function startAmbient(kind) {
     const src = audioCtx.createBufferSource(); src.buffer = buf; src.loop = true;
     const filt = audioCtx.createBiquadFilter(); filt.type = "lowpass";
     filt.frequency.value = kind === "lluvia" ? 1600 : 600;
-    const g = audioCtx.createGain(); g.gain.value = kind === "lluvia" ? 0.13 : 0.16;
+    const g = audioCtx.createGain(); g.gain.value = (kind === "lluvia" ? 0.13 : 0.16) * cfg.ambVol;
     src.connect(filt); filt.connect(g); g.connect(audioCtx.destination);
     const nodes = [src, filt, g];
     if (kind === "oceano") { // olas: volumen modulado lentamente
       const lfo = audioCtx.createOscillator(), lg = audioCtx.createGain();
-      lfo.frequency.value = 0.11; lg.gain.value = 0.09;
+      lfo.frequency.value = 0.11; lg.gain.value = 0.09 * cfg.ambVol;
       lfo.connect(lg); lg.connect(g.gain); lfo.start();
       nodes.push(lfo, lg);
     }
@@ -757,6 +853,7 @@ $("nav").addEventListener("click", (e) => {
    MEDITACIÓN
    ========================================================================= */
 function buildPattern(key) {
+  if (key === "free") return null; // sin guía: solo tiempo, ambiente y pulso suave
   if (key === "custom") {
     const p = [["Inhala", cfg.bIn]];
     if (cfg.bHold > 0) p.push(["Sostén", cfg.bHold]);
@@ -790,6 +887,7 @@ function renderMedStats() {
 function medPhaseLoop() {
   if (!med.running) return;
   const steps = buildPattern(med.pattern);
+  if (!steps) return;
   const [name, secs] = steps[med.stepIdx % steps.length];
   med.stepIdx++;
   $("breathPhase").textContent = name;
@@ -808,6 +906,7 @@ function medFinish(completed) {
   med.running = false;
   clearTimeout(med.phaseTimer); clearInterval(med.countInt); clearInterval(med.tick);
   stopAmbient();
+  $("breathCircle").classList.remove("freeFloat");
   releaseWakeLock("med");
   if (completed) {
     chime(432, 2.2); setTimeout(() => chime(528, 2.4), 350);
@@ -838,7 +937,10 @@ $("medStart").addEventListener("click", () => {
   requestWakeLock("med");
   startAmbient(med.amb);
   chime(432, 1.4);
-  setTimeout(() => { if (med.running) medPhaseLoop(); }, 900);
+  const free = med.pattern === "free";
+  $("breathCircle").classList.toggle("freeFloat", free);
+  if (free) { $("breathPhase").textContent = "Respira"; $("breathCount").textContent = ""; }
+  else setTimeout(() => { if (med.running) medPhaseLoop(); }, 900);
   med.tick = setInterval(() => {
     const left = med.endAt - Date.now();
     $("medRemaining").textContent = fmtMMSS(left);
@@ -974,7 +1076,7 @@ $("stroopStart").addEventListener("click", () => {
     $("stroopTime").textContent = left + " s";
     if (left <= 0) {
       clearInterval(st.int); st.on = false;
-      $("stroopWord").textContent = st.score + " ✓"; $("stroopWord").style.color = "#eef2ff";
+      $("stroopWord").textContent = st.score + " ✓"; $("stroopWord").style.color = "";
       $("stroopStart").style.display = "block"; $("stroopStart").textContent = "Jugar de nuevo";
       setBest("stroop", st.score, (a, b) => a > b);
       recordScore("stroop", st.score, "hi");
@@ -986,7 +1088,7 @@ gameCleanups.stroop = null; // asignado al salir
 document.querySelector("#game-stroop [data-back]").addEventListener("click", () => {
   clearInterval(st.int); st.on = false;
   $("stroopStart").style.display = "block";
-  $("stroopWord").textContent = "LISTO"; $("stroopWord").style.color = "#eef2ff";
+  $("stroopWord").textContent = "LISTO"; $("stroopWord").style.color = "";
   $("stroopTime").textContent = DIFF.stroopDur() + " s";
 });
 
@@ -1360,18 +1462,22 @@ function drawChart() {
   const pts = mind.hist.filter(h => h.idx != null).slice(-60);
   c.font = "12px -apple-system, sans-serif";
   if (pts.length < 2) {
-    c.fillStyle = "rgba(255,255,255,.45)"; c.textAlign = "center";
+    c.fillStyle = document.body.classList.contains("light") ? "rgba(35,45,90,.5)" : "rgba(255,255,255,.45)";
+    c.textAlign = "center";
     c.fillText(pts.length ? "Completa otra sesión para ver tu curva" : "Tu progreso aparecerá aquí", W / 2, H / 2);
     return;
   }
   const acc = getComputedStyle(document.documentElement).getPropertyValue("--accA").trim() || "#5b6cff";
+  const light = document.body.classList.contains("light");
+  const gridCol = light ? "rgba(35,45,90,.12)" : "rgba(255,255,255,.10)";
+  const lblCol = light ? "rgba(35,45,90,.55)" : "rgba(255,255,255,.45)";
   const P = { l: 34, r: 10, t: 12, b: 20 };
   const vals = pts.map(p => p.idx);
   let lo = Math.min(...vals), hi = Math.max(...vals);
   const padV = Math.max(30, (hi - lo) * 0.2); lo = Math.max(0, lo - padV); hi = Math.min(1000, hi + padV);
   const X = (i) => P.l + (W - P.l - P.r) * (pts.length === 1 ? 0.5 : i / (pts.length - 1));
   const Y = (v) => P.t + (H - P.t - P.b) * (1 - (v - lo) / (hi - lo || 1));
-  c.strokeStyle = "rgba(255,255,255,.10)"; c.fillStyle = "rgba(255,255,255,.45)"; c.textAlign = "left"; c.lineWidth = 1;
+  c.strokeStyle = gridCol; c.fillStyle = lblCol; c.textAlign = "left"; c.lineWidth = 1;
   [lo, (lo + hi) / 2, hi].forEach(v => {
     const y = Y(v);
     c.beginPath(); c.moveTo(P.l, y); c.lineTo(W - P.r, y); c.stroke();
@@ -1388,9 +1494,9 @@ function drawChart() {
   c.strokeStyle = acc; c.lineWidth = 2.5; c.lineJoin = "round"; c.stroke();
   pts.forEach((p, i) => {
     c.beginPath(); c.arc(X(i), Y(p.idx), i === pts.length - 1 ? 4.5 : 2.5, 0, 7);
-    c.fillStyle = i === pts.length - 1 ? "#fff" : acc; c.fill();
+    c.fillStyle = i === pts.length - 1 ? (light ? "#212842" : "#fff") : acc; c.fill();
   });
-  c.fillStyle = "rgba(255,255,255,.5)"; c.textAlign = "left";
+  c.fillStyle = lblCol; c.textAlign = "left";
   const fD = (d) => d.slice(8, 10) + "/" + d.slice(5, 7);
   c.fillText(fD(pts[0].d), P.l, H - 5);
   c.textAlign = "right"; c.fillText(fD(pts[pts.length - 1].d), W - P.r, H - 5);
@@ -1606,9 +1712,12 @@ window.addEventListener("pagehide", pedSave);
    ========================================================================= */
 function tickClock() {
   const d = new Date();
-  const hms = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
-  $("clockBig").textContent = hms;
-  $("miniClock").textContent = hms.slice(0, 5);
+  let h = d.getHours(), suf = "";
+  if (!cfg.h24) { suf = h >= 12 ? "pm" : "am"; h = h % 12 || 12; }
+  const base = (cfg.h24 ? pad(h) : String(h)) + ":" + pad(d.getMinutes());
+  $("clockBig").innerHTML = base + (cfg.showSec ? ":" + pad(d.getSeconds()) : "") +
+    (suf ? `<span style="font-size:.35em;opacity:.6"> ${suf}</span>` : "");
+  $("miniClock").textContent = base + (suf ? " " + suf : "");
   try {
     $("clockDate").textContent = d.toLocaleDateString("es", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
   } catch { $("clockDate").textContent = d.toDateString(); }
@@ -1783,8 +1892,62 @@ applyTheme(cfg.theme);
 
 $("cfgSound").checked = cfg.sound;
 $("cfgVib").checked = cfg.vib;
-$("cfgSound").addEventListener("change", (e) => { cfg.sound = e.target.checked; saveCfg(); if (cfg.sound) { ensureAudio(); chime(660, .3); } });
+$("cfgSound").addEventListener("change", (e) => { cfg.sound = e.target.checked; saveCfg(); if (cfg.sound) { ensureAudio(); chime(660, .3); } else stopAmbient(); });
 $("cfgVib").addEventListener("change", (e) => { cfg.vib = e.target.checked; saveCfg(); vibrate(40); });
+
+function markChips(id, attr, val) {
+  $(id).querySelectorAll(".chip").forEach(c => c.classList.toggle("sel", c.dataset[attr] === String(val)));
+}
+markChips("cfgMode", "mode", cfg.mode);
+chipGroup("cfgMode", "mode", v => { cfg.mode = v; saveCfg(); applyMode(); });
+markChips("cfgFsize", "fs", cfg.fsize);
+chipGroup("cfgFsize", "fs", v => { cfg.fsize = v; saveCfg(); applyDisplay(); });
+markChips("cfgAmbVol", "vol", cfg.ambVol);
+chipGroup("cfgAmbVol", "vol", v => {
+  cfg.ambVol = +v; saveCfg();
+  if (ambient.playing) { ensureAudio(); startAmbient(ambient.kind); } // aplicar en caliente
+});
+$("cfgOrbs").checked = cfg.orbs;
+$("cfgOrbs").addEventListener("change", (e) => { cfg.orbs = e.target.checked; saveCfg(); applyDisplay(); });
+$("cfgH24").checked = cfg.h24;
+$("cfgH24").addEventListener("change", (e) => { cfg.h24 = e.target.checked; saveCfg(); tickClock(); });
+$("cfgSec").checked = cfg.showSec;
+$("cfgSec").addEventListener("change", (e) => { cfg.showSec = e.target.checked; saveCfg(); tickClock(); });
+
+/* Copia de seguridad: exportar / importar todos los datos (100% local) */
+$("expBtn").addEventListener("click", () => {
+  try {
+    const data = {};
+    Object.keys(localStorage).filter(k => k.startsWith("zen:")).forEach(k => data[k] = localStorage.getItem(k));
+    const blob = new Blob([JSON.stringify({ app: "zen", v: 1, fecha: todayKey(), data }, null, 1)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "zen-copia-" + todayKey() + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast("Copia exportada 📦 Guárdala donde quieras.");
+  } catch { toast("No se pudo exportar en este navegador."); }
+});
+$("impBtn").addEventListener("click", () => $("impFile").click());
+$("impFile").addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const j = JSON.parse(rd.result);
+      const data = j && j.app === "zen" && j.data ? j.data : null;
+      if (!data || !Object.keys(data).some(k => k.startsWith("zen:"))) { toast("Ese archivo no es una copia de Zen."); return; }
+      Object.entries(data).forEach(([k, v]) => { if (k.startsWith("zen:")) try { localStorage.setItem(k, v); } catch {} });
+      toast("Copia restaurada ✓");
+      setTimeout(() => location.reload(), 900);
+    } catch { toast("El archivo está dañado o no es válido."); }
+  };
+  rd.readAsText(f);
+  e.target.value = "";
+});
+applyMode();
+applyDisplay();
 
 const CFG_LIMITS = { goal:[1000, 30000], stride:[40, 120], weight:[30, 180], bIn:[2, 10], bHold:[0, 12], bOut:[2, 14], bHold2:[0, 12] };
 const CFG_VIEWS = { goal:"vGoal", stride:"vStride", weight:"vWeight", bIn:"vBIn", bHold:"vBHold", bOut:"vBOut", bHold2:"vBHold2" };
