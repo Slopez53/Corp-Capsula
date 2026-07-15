@@ -136,6 +136,16 @@
   .gameCard b { display:block; font-size:16px; }
   .gameCard small { opacity:.55; font-size:12.5px; }
   .gameCard .best { margin-left:auto; text-align:right; font-size:13px; opacity:.7; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .gameCard .best span { display:block; }
+  .gameCard .todayTag { font-size:11px; color:var(--accA); margin-top:2px; font-weight:700; }
+  #nextBar {
+    position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 88px); transform:translateX(-50%);
+    z-index:40; border:none; cursor:pointer; color:#fff; font-weight:700; font-size:14px;
+    padding:13px 24px; border-radius:999px; white-space:nowrap;
+    background:linear-gradient(135deg,var(--accA),var(--accB));
+    box-shadow:0 8px 24px color-mix(in srgb, var(--accA) 45%, transparent);
+    animation:fadeIn .3s ease;
+  }
   .game { display:none; }
   .game.active { display:block; }
   .backBtn { background:none; border:none; color:#eef2ff; opacity:.65; font-size:14px; font-weight:600; cursor:pointer; padding:4px 0 14px; display:flex; align-items:center; gap:6px; }
@@ -358,27 +368,27 @@
         <button class="gameCard" data-game="react">
           <div class="ico">⚡</div>
           <div><b>Reacción</b><small>Velocidad de procesamiento</small></div>
-          <div class="best" id="bestReact">—</div>
+          <div class="best"><span id="bestReact">—</span><span class="todayTag" id="tdreact"></span></div>
         </button>
         <button class="gameCard" data-game="stroop">
           <div class="ico">🎨</div>
           <div><b>Stroop</b><small>Control inhibitorio y atención</small></div>
-          <div class="best" id="bestStroop">—</div>
+          <div class="best"><span id="bestStroop">—</span><span class="todayTag" id="tdstroop"></span></div>
         </button>
         <button class="gameCard" data-game="simon">
           <div class="ico">🔁</div>
           <div><b>Secuencias</b><small>Memoria de trabajo visoespacial</small></div>
-          <div class="best" id="bestSimon">—</div>
+          <div class="best"><span id="bestSimon">—</span><span class="todayTag" id="tdsimon"></span></div>
         </button>
         <button class="gameCard" data-game="digits">
           <div class="ico">🔢</div>
           <div><b>Dígitos</b><small>Amplitud de memoria inmediata</small></div>
-          <div class="best" id="bestDigits">—</div>
+          <div class="best"><span id="bestDigits">—</span><span class="todayTag" id="tddigits"></span></div>
         </button>
         <button class="gameCard" data-game="calc">
           <div class="ico">➗</div>
           <div><b>Cálculo</b><small>Agilidad y flexibilidad cognitiva</small></div>
-          <div class="best" id="bestCalc">—</div>
+          <div class="best"><span id="bestCalc">—</span><span class="todayTag" id="tdcalc"></span></div>
         </button>
         <p class="note">La neuroplasticidad se estimula con práctica <b>breve, diaria y progresiva</b>: la dificultad de cada ejercicio crece contigo. Combínalos con la meditación (atención) y la caminata (BDNF, el "fertilizante" neuronal) para máximo efecto.</p>
       </div>
@@ -719,6 +729,7 @@
   </nav>
 </div>
 
+<button id="nextBar" style="display:none"></button>
 <div id="pocket">
   <div id="pocketSteps">0</div>
   <div id="pocketHint">contando pasos · toca 2 veces para salir</div>
@@ -1018,7 +1029,9 @@ const TIPS = [
   "<b>Neuro-dato:</b> 10 minutos de meditación mejoran la atención sostenida medible en tareas como estas.",
   "<b>Neuro-dato:</b> alternar tipos de ejercicio (memoria, inhibición, cálculo) transfiere mejor que machacar uno solo."
 ];
-$("tip").innerHTML = TIPS[Math.floor(Math.random() * TIPS.length)];
+let tipI = Math.floor(Math.random() * TIPS.length);
+$("tip").innerHTML = TIPS[tipI];
+setInterval(() => { tipI = (tipI + 1) % TIPS.length; $("tip").innerHTML = TIPS[tipI]; }, 15000);
 
 function bests() { return store.get("best", {}); }
 function setBest(k, v, cmp) {
@@ -1040,6 +1053,7 @@ renderBests();
 
 const gameCleanups = { stroop: null, simon: null, digits: null, calc: null };
 function showGame(id) {
+  $("nextBar").style.display = "none";
   $("mindHome").style.display = id ? "none" : "block";
   document.querySelectorAll(".game").forEach(g => g.classList.toggle("active", g.id === "game-" + id));
   if (!id) Object.keys(gameCleanups).forEach(k => { if (gameCleanups[k]) { gameCleanups[k](); gameCleanups[k] = null; } });
@@ -1086,12 +1100,16 @@ $("reactPad").addEventListener("pointerdown", () => {
       $("reactPad").className = "";
       rxRender(`Promedio: ${avg} ms`, "Toca para jugar de nuevo");
       rx.state = "idle"; chime(660, .5);
+      maybeOfferNext();
     } else {
+      // Encadenar la siguiente ronda automáticamente, sin toque extra
       $("reactPad").className = "";
-      rxRender(ms + " ms", "Toca para la siguiente ronda");
-      rx.state = "next";
+      rxRender(ms + " ms", "preparando la siguiente ronda…");
+      rx.state = "auto";
+      rx.timeout = setTimeout(rxArm, 1400);
     }
   }
+  else if (rx.state === "auto") { clearTimeout(rx.timeout); rxArm(); }
   else if (rx.state === "next") rxArm();
 });
 // Al salir del ejercicio, cancelar cualquier ronda pendiente para no dejarlo "colgado"
@@ -1104,7 +1122,7 @@ document.querySelector("#game-react [data-back]").addEventListener("click", () =
 
 /* ---- Stroop ---- */
 const ST_COLORS = [["ROJO","#f43f5e"],["VERDE","#22c55e"],["AZUL","#3b82f6"],["AMARILLO","#eab308"]];
-const st = { on:false, score:0, endAt:0, int:0, answer:-1 };
+const st = { on:false, score:0, hits:0, errs:0, endAt:0, int:0, cd:0, answer:-1 };
 (function buildStroopBtns() {
   ST_COLORS.forEach(([name, hex], i) => {
     const b = document.createElement("button");
@@ -1124,16 +1142,13 @@ function stNext() {
 }
 function stAnswer(i) {
   if (!st.on) return;
-  if (i === st.answer) { st.score++; tone(880, .08, .1); }
-  else { st.score = Math.max(0, st.score - 1); vibrate(60); tone(220, .15, .12); }
+  if (i === st.answer) { st.score++; st.hits++; tone(880, .08, .1); }
+  else { st.errs++; st.score = Math.max(0, st.score - 1); vibrate(60); tone(220, .15, .12); }
   $("stroopScore").textContent = "Aciertos: " + st.score;
   stNext();
 }
-$("stroopStart").addEventListener("click", () => {
-  ensureAudio();
-  st.on = true; st.score = 0; st.endAt = Date.now() + DIFF.stroopDur() * 1000;
-  $("stroopScore").textContent = "Aciertos: 0";
-  $("stroopStart").style.display = "none";
+function stBegin() {
+  st.on = true; st.endAt = Date.now() + DIFF.stroopDur() * 1000;
   stNext();
   clearInterval(st.int);
   st.int = setInterval(() => {
@@ -1141,17 +1156,35 @@ $("stroopStart").addEventListener("click", () => {
     $("stroopTime").textContent = left + " s";
     if (left <= 0) {
       clearInterval(st.int); st.on = false;
+      const tot = st.hits + st.errs;
+      const acc = tot ? Math.round(st.hits / tot * 100) : 0;
       $("stroopWord").textContent = st.score + " ✓"; $("stroopWord").style.color = "";
+      $("stroopScore").textContent = `Aciertos: ${st.score} · precisión ${acc}%`;
       $("stroopStart").style.display = "block"; $("stroopStart").textContent = "Jugar de nuevo";
       setBest("stroop", st.score, (a, b) => a > b);
       recordScore("stroop", st.score, "hi");
       chime(660, .8); vibrate([80, 60, 80]);
+      maybeOfferNext();
     }
   }, 250);
+}
+$("stroopStart").addEventListener("click", () => {
+  ensureAudio();
+  st.score = 0; st.hits = 0; st.errs = 0;
+  $("stroopScore").textContent = "Aciertos: 0";
+  $("stroopStart").style.display = "none";
+  $("stroopWord").style.color = "";
+  let n = 3; // cuenta atrás para no perder los primeros segundos por sorpresa
+  clearTimeout(st.cd);
+  const cd = () => {
+    if (n > 0) { $("stroopWord").textContent = n; tone(440, .1, .08); n--; st.cd = setTimeout(cd, 650); }
+    else stBegin();
+  };
+  cd();
 });
 gameCleanups.stroop = null; // asignado al salir
 document.querySelector("#game-stroop [data-back]").addEventListener("click", () => {
-  clearInterval(st.int); st.on = false;
+  clearInterval(st.int); clearTimeout(st.cd); st.on = false;
   $("stroopStart").style.display = "block";
   $("stroopWord").textContent = "LISTO"; $("stroopWord").style.color = "";
   $("stroopTime").textContent = DIFF.stroopDur() + " s";
@@ -1186,6 +1219,7 @@ function smNextLevel() {
 }
 function smReset(msg) {
   sm.timeouts.forEach(clearTimeout); sm.timeouts = [];
+  document.querySelectorAll(".simonPad").forEach(p => p.classList.remove("lit"));
   sm.seq = []; sm.level = 0; sm.accept = false; sm.playing = false;
   $("simonStart").style.display = "block";
   if (msg) $("simonMsg").textContent = msg;
@@ -1210,9 +1244,16 @@ $("simonGrid").addEventListener("pointerdown", (e) => {
     }
   } else {
     vibrate([90, 60, 90]); tone(150, .4, .15, "sawtooth");
-    const reached = sm.level;
-    smReset(`Fin: llegaste al nivel ${reached}. Toca Comenzar para reintentar.`);
-    $("simonStart").textContent = "Jugar de nuevo";
+    const reached = sm.level, correct = sm.seq[sm.idx];
+    sm.accept = false;
+    // Mostrar cuál era el pad correcto: sin feedback no se aprende del error
+    const padOk = document.querySelector(`.simonPad[data-p="${correct}"]`);
+    setTimeout(() => { padOk.classList.add("lit"); tone(SIMON_TONES[correct], .5, .12, "triangle"); }, 250);
+    setTimeout(() => {
+      smReset(`Llegaste al nivel ${reached}. El pad iluminado era el correcto.`);
+      $("simonStart").textContent = "Jugar de nuevo";
+      maybeOfferNext();
+    }, 1100);
   }
 });
 document.querySelector("#game-simon [data-back]").addEventListener("click", () => smReset("Observa la secuencia y repítela"));
@@ -1235,6 +1276,8 @@ function dgShowSeq() {
   $("digitLevel").textContent = "Amplitud: " + dg.span;
   const showMs = DIFF.digitShowMs(); // dígitos más fugaces a mayor nivel
   let i = 0;
+  // Avisar cuántos dígitos vienen antes de empezar
+  $("digitShow").textContent = dg.span + " dígitos…";
   const step = () => {
     if (i < dg.target.length) {
       $("digitShow").textContent = dg.target[i];
@@ -1250,7 +1293,7 @@ function dgShowSeq() {
       $("digitPad").style.display = "grid";
     }
   };
-  step();
+  dg.timeouts.push(setTimeout(step, 950));
 }
 function dgKey(k) {
   if (dg.showing) return;
@@ -1271,6 +1314,7 @@ function dgKey(k) {
       $("digitStart").style.display = "block";
       $("digitStart").textContent = "Reintentar";
       dg.span = Math.max(3, dg.span - 1);
+      maybeOfferNext();
     }
     return;
   }
@@ -1290,7 +1334,7 @@ document.querySelector("#game-digits [data-back]").addEventListener("click", () 
 });
 
 /* ---- Cálculo ---- */
-const ca = { on:false, score:0, endAt:0, int:0, answer:0 };
+const ca = { on:false, score:0, endAt:0, int:0, cd:0, answer:0 };
 function caNext() {
   const lvl = Math.min(7, 1 + Math.floor(ca.score / 5) + DIFF.calcBoost()); // dificultad progresiva + nivel global
   const r = (n) => Math.floor(Math.random() * n) + 1;
@@ -1321,11 +1365,8 @@ function caNext() {
     $("calcOpts").appendChild(b2);
   });
 }
-$("calcStart").addEventListener("click", () => {
-  ensureAudio();
-  ca.on = true; ca.score = 0; ca.endAt = Date.now() + DIFF.calcDur() * 1000;
-  $("calcScore").textContent = "Aciertos: 0";
-  $("calcStart").style.display = "none";
+function caBegin() {
+  ca.on = true; ca.endAt = Date.now() + DIFF.calcDur() * 1000;
   caNext();
   clearInterval(ca.int);
   ca.int = setInterval(() => {
@@ -1339,11 +1380,26 @@ $("calcStart").addEventListener("click", () => {
       setBest("calc", ca.score, (a, b) => a > b);
       recordScore("calc", ca.score, "hi");
       chime(660, .8); vibrate([80, 60, 80]);
+      maybeOfferNext();
     }
   }, 250);
+}
+$("calcStart").addEventListener("click", () => {
+  ensureAudio();
+  ca.score = 0;
+  $("calcScore").textContent = "Aciertos: 0";
+  $("calcStart").style.display = "none";
+  $("calcOpts").innerHTML = "";
+  let n = 3;
+  clearTimeout(ca.cd);
+  const cd = () => {
+    if (n > 0) { $("calcQ").textContent = n; tone(440, .1, .08); n--; ca.cd = setTimeout(cd, 650); }
+    else caBegin();
+  };
+  cd();
 });
 document.querySelector("#game-calc [data-back]").addEventListener("click", () => {
-  clearInterval(ca.int); ca.on = false;
+  clearInterval(ca.int); clearTimeout(ca.cd); ca.on = false;
   $("calcQ").textContent = "¿Listo?"; $("calcOpts").innerHTML = "";
   $("calcStart").style.display = "block"; $("calcTime").textContent = DIFF.calcDur() + " s";
 });
@@ -1461,6 +1517,27 @@ $("retoBody").addEventListener("click", (e) => {
 });
 $("reportBtn").addEventListener("click", () => { buildReport(); showGame("report"); });
 
+/* Flujo guiado: al terminar un ejercicio, ofrecer el siguiente pendiente del día */
+function nextPending() {
+  const r = todayRec(false), g = r ? r.g : {};
+  return MIND_GAMES.find(k => g[k] === undefined) || null;
+}
+function maybeOfferNext() {
+  const r = todayRec(false);
+  if (!r || !Object.keys(r.g).length) return;
+  const nk = nextPending();
+  if (!nk) { $("nextBar").style.display = "none"; return; }
+  $("nextBar").textContent = "Siguiente: " + GAME_META[nk].ico + " " + GAME_META[nk].n + " →";
+  $("nextBar").style.display = "block";
+  clearTimeout(maybeOfferNext._t);
+  maybeOfferNext._t = setTimeout(() => { $("nextBar").style.display = "none"; }, 7000);
+}
+$("nextBar").addEventListener("click", () => {
+  const nk = nextPending();
+  $("nextBar").style.display = "none";
+  if (nk) { ensureAudio(); showGame(nk); }
+});
+
 function prevValue(game, beforeDate) {
   for (let i = mind.hist.length - 1; i >= 0; i--) {
     const h = mind.hist[i];
@@ -1572,6 +1649,12 @@ function renderMind() {
   $("pgIdx").textContent = today && today.idx != null ? today.idx : (recs.length ? recs[recs.length - 1].idx : "—");
   $("pgLvl").textContent = mind.level + 1;
   $("pgSes").textContent = recs.length;
+  // Marcar en cada tarjeta el resultado de hoy, para ver qué falta del día
+  const gg = today ? today.g : {};
+  MIND_GAMES.forEach(k => {
+    const el = $("td" + k);
+    if (el) el.textContent = gg[k] !== undefined ? "hoy " + gg[k] + GAME_META[k].u : "";
+  });
   if (!st.on) $("stroopTime").textContent = DIFF.stroopDur() + " s";
   if (!ca.on) $("calcTime").textContent = DIFF.calcDur() + " s";
   renderReto();
