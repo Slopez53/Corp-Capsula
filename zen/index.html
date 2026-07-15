@@ -195,10 +195,11 @@
   #stepDot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#64748b; margin-right:7px; vertical-align:2px; }
   #stepDot.on { background:#34d399; box-shadow:0 0 10px #34d399; animation:pulse 1.4s infinite; }
   @keyframes pulse { 50% { opacity:.45; } }
-  #weekBars { display:flex; gap:7px; align-items:flex-end; height:86px; margin-top:6px; }
-  #weekBars .wb { flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; height:100%; justify-content:flex-end; }
-  #weekBars .bar { width:100%; border-radius:7px 7px 3px 3px; background:linear-gradient(180deg,var(--accA),var(--accB)); min-height:3px; opacity:.85; }
-  #weekBars small { font-size:10px; opacity:.5; text-transform:uppercase; }
+  .weekbars { display:flex; gap:7px; align-items:flex-end; height:86px; margin-top:6px; }
+  .weekbars .wb { flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; height:100%; justify-content:flex-end; }
+  .weekbars .bar { width:100%; border-radius:7px 7px 3px 3px; background:linear-gradient(180deg,var(--accA),var(--accB)); min-height:3px; opacity:.85; }
+  .weekbars small { font-size:10px; opacity:.5; text-transform:uppercase; }
+  .weekbars .wv { font-size:10px; opacity:.7; font-variant-numeric:tabular-nums; }
   #sensorStatus { font-size:12.5px; margin-top:10px; opacity:.7; }
 
   /* ---- Modo bolsillo ---- */
@@ -315,6 +316,8 @@
           <div class="stat"><b id="stMinutes">0</b><span>minutos</span></div>
           <div class="stat"><b id="stStreak">0</b><span>racha días</span></div>
         </div>
+        <h2 style="margin-top:20px">Minutos · últimos 7 días</h2>
+        <div id="medWeek" class="weekbars" style="height:64px"></div>
       </div>
 
       <div class="glass" id="medActive" style="display:none">
@@ -326,7 +329,10 @@
           <div id="medRemaining">--:--</div>
         </div>
         <div style="height:16px"></div>
-        <button class="btn stop" id="medStop">Terminar</button>
+        <div class="row">
+          <button class="btn ghost" id="medPause">Pausar</button>
+          <button class="btn stop" id="medStop">Terminar</button>
+        </div>
       </div>
     </section>
 
@@ -491,7 +497,7 @@
       </div>
       <div class="glass">
         <h2>Últimos 7 días</h2>
-        <div id="weekBars"></div>
+        <div id="weekBars" class="weekbars"></div>
         <div class="statgrid">
           <div class="stat"><b id="stepTotal">0</b><span>total histórico</span></div>
           <div class="stat"><b id="stepAvg">0</b><span>media 7 días</span></div>
@@ -534,6 +540,7 @@
               <button class="chip" data-s="300">5 min</button>
               <button class="chip" data-s="600">10 min</button>
               <button class="chip" data-s="1800">30 min</button>
+              <button class="chip" data-s="3600">1 h</button>
             </div>
             <div class="stepper">
               <div>
@@ -878,11 +885,31 @@ chipGroup("medDur", "min", v => med.minutes = +v);
 chipGroup("medPat", "pat", v => med.pattern = v);
 chipGroup("medAmb", "amb", v => med.amb = v);
 
+function yesterdayKey() {
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  return y.getFullYear() + "-" + pad(y.getMonth() + 1) + "-" + pad(y.getDate());
+}
 function renderMedStats() {
-  const s = store.get("med", { sessions:0, minutes:0, streak:0, last:"" });
+  const s = store.get("med", { sessions:0, minutes:0, streak:0, last:"", days:{} });
   $("stSessions").textContent = s.sessions;
   $("stMinutes").textContent = Math.round(s.minutes);
-  $("stStreak").textContent = s.streak;
+  // La racha solo sigue viva si meditaste hoy o ayer
+  $("stStreak").textContent = (s.last === todayKey() || s.last === yesterdayKey()) ? s.streak : 0;
+  const wrap = $("medWeek");
+  wrap.innerHTML = "";
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const k = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    days.push({ v: (s.days || {})[k] || 0, lbl: ["D","L","M","X","J","V","S"][d.getDay()] });
+  }
+  const max = Math.max(10, ...days.map(x => x.v));
+  days.forEach(({ v, lbl }) => {
+    const el = document.createElement("div");
+    el.className = "wb";
+    el.innerHTML = `${v ? `<span class="wv">${v}</span>` : ""}<div class="bar" style="height:${Math.max(3, Math.round(v / max * 40))}px;opacity:${v ? .85 : .25}"></div><small>${lbl}</small>`;
+    wrap.appendChild(el);
+  });
 }
 function medPhaseLoop() {
   if (!med.running) return;
@@ -902,22 +929,33 @@ function medPhaseLoop() {
   med.countInt = setInterval(() => { left--; if (left > 0) $("breathCount").textContent = left; }, 1000);
   med.phaseTimer = setTimeout(medPhaseLoop, secs * 1000);
 }
+function medTickStart() {
+  clearInterval(med.tick);
+  med.tick = setInterval(() => {
+    const left = med.endAt - Date.now();
+    $("medRemaining").textContent = fmtMMSS(left);
+    if (left <= 0) medFinish(true);
+  }, 250);
+}
 function medFinish(completed) {
-  med.running = false;
+  med.running = false; med.paused = false;
   clearTimeout(med.phaseTimer); clearInterval(med.countInt); clearInterval(med.tick);
   stopAmbient();
   $("breathCircle").classList.remove("freeFloat");
+  $("medPause").textContent = "Pausar";
   releaseWakeLock("med");
   if (completed) {
     chime(432, 2.2); setTimeout(() => chime(528, 2.4), 350);
     vibrate([120, 80, 120]);
-    const s = store.get("med", { sessions:0, minutes:0, streak:0, last:"" });
+    const s = store.get("med", { sessions:0, minutes:0, streak:0, last:"", days:{} });
     s.sessions++; s.minutes += med.minutes;
+    if (!s.days) s.days = {};
+    s.days[todayKey()] = (s.days[todayKey()] || 0) + med.minutes;
+    const dk = Object.keys(s.days).sort();
+    while (dk.length > 30) delete s.days[dk.shift()];
     const today = todayKey();
     if (s.last !== today) {
-      const y = new Date(); y.setDate(y.getDate() - 1);
-      const yk = y.getFullYear() + "-" + pad(y.getMonth()+1) + "-" + pad(y.getDate());
-      s.streak = (s.last === yk) ? s.streak + 1 : 1;
+      s.streak = (s.last === yesterdayKey()) ? s.streak + 1 : 1;
       s.last = today;
     }
     store.set("med", s);
@@ -929,10 +967,11 @@ function medFinish(completed) {
 }
 $("medStart").addEventListener("click", () => {
   ensureAudio();
-  med.running = true; med.stepIdx = 0;
+  med.running = true; med.paused = false; med.stepIdx = 0;
   med.endAt = Date.now() + med.minutes * 60000;
   $("medSetup").style.display = "none";
   $("medActive").style.display = "block";
+  $("medPause").textContent = "Pausar";
   $("medRemaining").textContent = fmtMMSS(med.minutes * 60000);
   requestWakeLock("med");
   startAmbient(med.amb);
@@ -940,12 +979,31 @@ $("medStart").addEventListener("click", () => {
   const free = med.pattern === "free";
   $("breathCircle").classList.toggle("freeFloat", free);
   if (free) { $("breathPhase").textContent = "Respira"; $("breathCount").textContent = ""; }
-  else setTimeout(() => { if (med.running) medPhaseLoop(); }, 900);
-  med.tick = setInterval(() => {
-    const left = med.endAt - Date.now();
-    $("medRemaining").textContent = fmtMMSS(left);
-    if (left <= 0) medFinish(true);
-  }, 250);
+  else setTimeout(() => { if (med.running && !med.paused) medPhaseLoop(); }, 900);
+  medTickStart();
+});
+$("medPause").addEventListener("click", () => {
+  if (!med.running) return;
+  if (!med.paused) {
+    med.paused = true;
+    med.remain = med.endAt - Date.now();
+    clearTimeout(med.phaseTimer); clearInterval(med.countInt); clearInterval(med.tick);
+    stopAmbient();
+    $("breathCircle").classList.remove("freeFloat");
+    $("breathPhase").textContent = "En pausa";
+    $("breathCount").textContent = "";
+    $("medPause").textContent = "Continuar";
+  } else {
+    med.paused = false;
+    med.endAt = Date.now() + med.remain;
+    ensureAudio(); startAmbient(med.amb);
+    $("medPause").textContent = "Pausar";
+    if (med.pattern === "free") {
+      $("breathCircle").classList.add("freeFloat");
+      $("breathPhase").textContent = "Respira";
+    } else medPhaseLoop();
+    medTickStart();
+  }
 });
 $("medStop").addEventListener("click", () => medFinish(false));
 renderMedStats();
@@ -1035,6 +1093,13 @@ $("reactPad").addEventListener("pointerdown", () => {
     }
   }
   else if (rx.state === "next") rxArm();
+});
+// Al salir del ejercicio, cancelar cualquier ronda pendiente para no dejarlo "colgado"
+document.querySelector("#game-react [data-back]").addEventListener("click", () => {
+  clearTimeout(rx.timeout);
+  rx.state = "idle"; rx.results = [];
+  $("reactPad").className = "";
+  rxRender("Toca para empezar", "5 rondas · toca cuando se ponga verde");
 });
 
 /* ---- Stroop ---- */
@@ -1536,12 +1601,20 @@ function pedLoad() {
     d.day = todayKey(); d.today = 0;
     store.set("steps", d);
   }
-  ped.steps = d.today; ped.total = d.total; ped.hist = d.hist;
+  ped.steps = d.today; ped.total = d.total; ped.hist = d.hist; ped.day = d.day;
   pedRender();
 }
 function pedSave() {
-  store.set("steps", { day: todayKey(), today: ped.steps, total: ped.total, hist: ped.hist || {} });
+  store.set("steps", { day: ped.day || todayKey(), today: ped.steps, total: ped.total, hist: ped.hist || {} });
 }
+// Cierre de día a medianoche aunque la app siga abierta
+function pedDayRollover() {
+  if (ped.day === todayKey()) return;
+  if (ped.steps > 0) { ped.hist = ped.hist || {}; ped.hist[ped.day] = (ped.hist[ped.day] || 0) + ped.steps; }
+  ped.steps = 0; ped.day = todayKey();
+  pedSave(); pedRender();
+}
+setInterval(pedDayRollover, 60000);
 function pedRender() {
   $("stepCount").textContent = ped.steps.toLocaleString("es");
   $("stepTotal").textContent = ped.total.toLocaleString("es");
@@ -1549,8 +1622,15 @@ function pedRender() {
   const m = Math.round(ped.steps * cfg.stride / 100);
   const kcal = Math.round(ped.steps * 0.04 * (cfg.weight / 70));
   $("stepDist").textContent = "≈ " + m.toLocaleString("es") + " m · " + kcal + " kcal";
-  $("stepGoalTxt").textContent = "meta " + cfg.goal.toLocaleString("es");
+  const pct = Math.min(999, Math.round(ped.steps / cfg.goal * 100));
+  $("stepGoalTxt").textContent = "meta " + cfg.goal.toLocaleString("es") + " · " + pct + "%";
   $("stepRingFg").style.strokeDashoffset = STEP_RING_C * (1 - Math.min(1, ped.steps / cfg.goal));
+  if (ped.steps >= cfg.goal && store.get("goalDay", "") !== todayKey()) {
+    store.set("goalDay", todayKey());
+    toast("🎉 ¡Meta diaria de " + cfg.goal.toLocaleString("es") + " pasos alcanzada!", 4500);
+    chime(660, .5); setTimeout(() => chime(880, .7), 220);
+    vibrate([80, 60, 80, 60, 160]);
+  }
   renderWeek();
 }
 function renderWeek() {
@@ -1576,6 +1656,7 @@ function renderWeek() {
 }
 function onMotion(e) {
   if (!ped.active) return;
+  if (ped.day !== todayKey()) pedDayRollover();
   ped.gotData = true;
   // Preferir aceleración lineal (sin gravedad); si no existe, usar la total —
   // la línea base adaptativa absorbe la gravedad automáticamente.
@@ -1733,7 +1814,12 @@ $("timeSeg").addEventListener("click", (e) => {
 /* =========================================================================
    CRONÓMETRO (timestamps: exacto tras standby)
    ========================================================================= */
-const sw = { running:false, startAt:0, acc:0, raf:0, lastLap:0, laps:0 };
+const sw = { running:false, startAt:0, acc:0, raf:0, lastLap:0, laps:0, lapArr:[] };
+function swSave() {
+  store.set("sw", (sw.running || sw.acc > 0)
+    ? { r: sw.running, s: sw.startAt, a: sw.acc, ll: sw.lastLap, laps: sw.lapArr }
+    : null);
+}
 function swFmt(ms) {
   const cs = Math.floor((ms % 1000) / 10);
   const s = Math.floor(ms / 1000);
@@ -1743,6 +1829,11 @@ function swElapsed() { return sw.acc + (sw.running ? Date.now() - sw.startAt : 0
 function swFrame() {
   $("swDisplay").innerHTML = swFmt(swElapsed());
   if (sw.running) sw.raf = requestAnimationFrame(swFrame);
+}
+function swAddLapRow(n, d, t) {
+  const li = document.createElement("li");
+  li.innerHTML = `<span>Vuelta ${n}</span><span>+${fmtMMSS(d)}</span><span>${fmtMMSS(t)}</span>`;
+  $("laps").prepend(li);
 }
 $("swMain").addEventListener("click", () => {
   if (!sw.running) {
@@ -1757,22 +1848,40 @@ $("swMain").addEventListener("click", () => {
     $("swLap").textContent = "Borrar";
     swFrame();
   }
+  swSave();
 });
 $("swLap").addEventListener("click", () => {
   if (sw.running) {
     const t = swElapsed(); sw.laps++;
-    const li = document.createElement("li");
-    li.innerHTML = `<span>Vuelta ${sw.laps}</span><span>+${fmtMMSS(t - sw.lastLap)}</span><span>${fmtMMSS(t)}</span>`;
-    $("laps").prepend(li);
+    swAddLapRow(sw.laps, t - sw.lastLap, t);
+    sw.lapArr.push({ n: sw.laps, d: t - sw.lastLap, t });
     sw.lastLap = t;
   } else {
-    sw.acc = 0; sw.lastLap = 0; sw.laps = 0;
+    sw.acc = 0; sw.lastLap = 0; sw.laps = 0; sw.lapArr = [];
     $("laps").innerHTML = "";
     $("swDisplay").innerHTML = swFmt(0);
     $("swMain").textContent = "Iniciar";
     $("swLap").disabled = true; $("swLap").textContent = "Vuelta";
   }
+  swSave();
 });
+// El cronómetro sobrevive a recargas y al standby (basado en timestamps)
+(function swRestore() {
+  const s = store.get("sw", null);
+  if (!s) return;
+  sw.running = !!s.r; sw.startAt = s.s || 0; sw.acc = s.a || 0;
+  sw.lastLap = s.ll || 0; sw.lapArr = s.laps || []; sw.laps = sw.lapArr.length;
+  sw.lapArr.forEach(l => swAddLapRow(l.n, l.d, l.t));
+  if (sw.running) {
+    $("swMain").textContent = "Pausar"; $("swMain").classList.add("stop");
+    $("swLap").disabled = false;
+    swFrame();
+  } else if (sw.acc > 0) {
+    $("swMain").textContent = "Continuar";
+    $("swLap").disabled = false; $("swLap").textContent = "Borrar";
+    swFrame();
+  }
+})();
 
 /* =========================================================================
    TEMPORIZADOR (sobrevive standby y recargas)
@@ -1813,6 +1922,7 @@ function tmStart(ms) {
   store.set("timer", { endAt: tm.endAt, totalMs: tm.totalMs });
   tmShow(true);
   $("tmMain").textContent = "Cancelar"; $("tmMain").classList.add("stop");
+  $("tmReset").textContent = "Reiniciar";
   clearInterval(tm.int);
   tm.int = setInterval(tmTick, 200);
   tmTick();
@@ -1823,6 +1933,7 @@ function tmCancel() {
   store.set("timer", null);
   tmShow(false);
   $("tmMain").textContent = "Iniciar"; $("tmMain").classList.remove("stop");
+  $("tmReset").textContent = "Reiniciar";
 }
 function tmDone() {
   tm.running = false; clearInterval(tm.int);
@@ -1838,6 +1949,7 @@ function tmDone() {
   }, 900);
   chime(880, .35, .22);
   $("tmMain").textContent = "Listo ✓"; $("tmMain").classList.remove("stop");
+  $("tmReset").textContent = "Repetir";
   toast("⏰ ¡Tiempo cumplido!");
 }
 $("tmMain").addEventListener("click", () => {
@@ -1847,7 +1959,12 @@ $("tmMain").addEventListener("click", () => {
   if (ms < 1000) { toast("Elige una duración."); return; }
   tmStart(ms);
 });
-$("tmReset").addEventListener("click", tmCancel);
+// Reiniciar: vuelve a empezar la misma duración (y "Repetir" tras terminar)
+$("tmReset").addEventListener("click", () => {
+  if (!tm.totalMs) { tmCancel(); return; }
+  tmStopAlarm();
+  tmStart(tm.totalMs);
+});
 tmRenderSetup();
 (function tmRestore() {
   const saved = store.get("timer", null);
@@ -1870,7 +1987,7 @@ tmRenderSetup();
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     if (tm.running) tmTick();
-    if (med.running && med.endAt - Date.now() <= 0) medFinish(true);
+    if (med.running && !med.paused && med.endAt - Date.now() <= 0) medFinish(true);
     if (sw.running) swFrame();
   }
 });
